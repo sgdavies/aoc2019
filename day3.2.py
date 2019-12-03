@@ -37,7 +37,7 @@ def get_crossings (wire1, wire2):
 
     t4 = time.time()
 
-    grid.grid[originY][originX] = 'O'
+    #grid.grid[originY][originX] = 'O'
     if max(width, height) < 20:
         grid.display()
 
@@ -54,9 +54,9 @@ def get_crossings (wire1, wire2):
 class Grid():
     def __init__ (self, width, height, oX=0, oY=0):
         t0 = time.time()
-        self.grid = [[1]*width for _ in range(height)]
+        self.grid = {} #[[1]*width for _ in range(height)]
         t1 = time.time()
-        self.d_grid = [[0]*width for _ in range(height)]  # distances
+        self.d_grid = {} #[[0]*width for _ in range(height)]  # distances
         t2 = time.time()
         self.oX = oX
         self.oY = oY
@@ -65,13 +65,15 @@ class Grid():
         print "%3.2f, %3.2f, %3.2f = %3.2f\tGrid.__init__" %(t1-t0, t2-t1, now-t2, now-t0)
 
     def step (self, x, y, key, dist):
-        self.grid[y][x] *= key
-        self.d_grid[y][x] += dist
+        #self.grid[y][x] *= key
+        #self.d_grid[y][x] += dist
+        self.grid[(x,y)] = self.grid.get( (x,y), 1 ) * key
+        self.d_grid[(x,y)] = self.d_grid.get( (x,y), 0 ) + dist
 
-        if self._other_prime_factor(self.grid[y][x], key):
+        if self._other_prime_factor(self.grid[(x,y)], key):
             # Someone's been here before! Remember it. (Also - check distance
             # is a cross as well!)
-            total_d = self.d_grid[y][x]
+            total_d = self.d_grid[(x,y)]
             #print x,y, self.grid[y][x], key, dist, total_d
             assert(total_d != dist)
             self.crossings.append( (x - self.oX, y - self.oY, total_d) )
@@ -92,10 +94,11 @@ class Grid():
         return not (factor**x == value)
 
     def display (self):
-        print "\n".join(["".join([str(x if x is not 1 else '.') for x in row]) for row in self.grid][::-1])
-        print
-        print "\n".join(["".join([str(x if x is not 1 else '.') for x in row]) for row in self.d_grid][::-1])
-        print
+        #print "\n".join(["".join([str(x if x is not 1 else '.') for x in row]) for row in self.grid][::-1])
+        #print
+        #print "\n".join(["".join([str(x if x is not 1 else '.') for x in row]) for row in self.d_grid][::-1])
+        #print
+        pass
 
 
 class Wire():
