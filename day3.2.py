@@ -35,21 +35,21 @@ def get_crossings (wire1, wire2):
     wire1.track(grid)
     wire2.track(grid)
 
-
-    crossings = []
-
-    common = wire1.key * wire2.key
-
-    for y in range(height):
-        for x in range(width):
-            if grid.grid[y][x] % common == 0:
-                crossings.append( (x - grid.oX, y - grid.oY, grid.d_grid[y][x]) )
+    t4 = time.time()
 
     grid.grid[originY][originX] = 'O'
     if max(width, height) < 20:
         grid.display()
 
-    return crossings
+    #common = wire1.key * wire2.key
+    #for y in range(height):
+    #    for x in range(width):
+    #        if grid.grid[y][x] % common == 0:
+    #            crossings.append( (x - grid.oX, y - grid.oY, grid.d_grid[y][x]) )
+
+    now = time.time()
+    print "%3.2f, %3.2f, %3.2f, %3.2f = %3.2f\tget_crossings" %(t2-t1, t3-t2, t4-t3, now-t4, now-t1)
+    return grid.crossings
 
 class Grid():
     def __init__ (self, width, height, oX=0, oY=0):
@@ -60,6 +60,36 @@ class Grid():
         t2 = time.time()
         self.oX = oX
         self.oY = oY
+        self.crossings = []
+        now = time.time()
+        print "%3.2f, %3.2f, %3.2f = %3.2f\tGrid.__init__" %(t1-t0, t2-t1, now-t2, now-t0)
+
+    def step (self, x, y, key, dist):
+        self.grid[y][x] *= key
+        self.d_grid[y][x] += dist
+
+        if self._other_prime_factor(self.grid[y][x], key):
+            # Someone's been here before! Remember it. (Also - check distance
+            # is a cross as well!)
+            total_d = self.d_grid[y][x]
+            #print x,y, self.grid[y][x], key, dist, total_d
+            assert(total_d != dist)
+            self.crossings.append( (x - self.oX, y - self.oY, total_d) )
+
+    @staticmethod
+    def _other_prime_factor (value, factor):
+        # Determine if value has more prime factors than 'factor'
+        test = value
+        for x in range(1,10):
+            test /= factor
+            #print value, test, factor, x
+            if test == 1:
+                break
+            elif test == 0:
+                return True
+
+        assert(x < 9) # don't go on forever...
+        return not (factor**x == value)
 
     def display (self):
         print "\n".join(["".join([str(x if x is not 1 else '.') for x in row]) for row in self.grid][::-1])
@@ -149,8 +179,9 @@ class Wire():
 
         for _ in range(distance):
             nextX, nextY = self.move(nextX, nextY, direction)
-            grid.grid[nextY][nextX] *= self.key
-            grid.d_grid[nextY][nextX] += self.d
+
+            grid.step(nextX, nextY, self.key, self.d)
+
             self.d += 1
             #grid.display()
 
