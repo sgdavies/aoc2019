@@ -1,15 +1,18 @@
-import re
+import re,time
 
 def closest_crossing (wire1, wire2):
+    start = time.time()
     crossings = get_crossings(wire1, wire2)
     manhattens = map(lambda pos: abs(pos[0]) + abs(pos[1]), crossings)
     distances = [cross[2] for cross in crossings]
 
     print crossings
     print distances
+    print "%3.2f\tclosest_crossing" %(time.time()-start)
     return sorted(manhattens)[0], sorted(distances)[0]
 
 def get_crossings (wire1, wire2):
+    t1 = time.time()
     minX = min(wire1.minx, wire2.minx)
     maxX = max(wire1.maxx, wire2.maxx)
     minY = min(wire1.miny, wire2.miny)
@@ -23,7 +26,11 @@ def get_crossings (wire1, wire2):
 
     print "Grid size:", width, height, "(%d..%d | %d..%d)" %(minX,maxX, minY,maxY), "origin [%d,%d]"%(originX, originY)
 
+    t2 = time.time()
+
     grid = Grid(width, height, originX, originY)
+
+    t3 = time.time()
 
     wire1.track(grid)
     wire2.track(grid)
@@ -46,8 +53,11 @@ def get_crossings (wire1, wire2):
 
 class Grid():
     def __init__ (self, width, height, oX=0, oY=0):
+        t0 = time.time()
         self.grid = [[1]*width for _ in range(height)]
+        t1 = time.time()
         self.d_grid = [[0]*width for _ in range(height)]  # distances
+        t2 = time.time()
         self.oX = oX
         self.oY = oY
 
@@ -64,6 +74,7 @@ class Wire():
     instruction_re = re.compile("(?P<direction>[UDLR])(?P<len>\d+)")
 
     def __init__ (self, path_str):
+        start = time.time()
         self.key = Wire._get_key()
 
         rpath = []
@@ -75,6 +86,7 @@ class Wire():
         self._find_extremes()
 
         self.d = 1 # Total distance tracked so far
+        print "%3.2f\tWire.__init__" %(time.time()-start)
 
     @staticmethod
     def _get_key ():
@@ -85,6 +97,7 @@ class Wire():
         Wire.keys = list(Wire.KEYS)
 
     def _find_extremes (self):
+        start = time.time()
         minx = 0
         maxx = 0
         curx = 0
@@ -113,8 +126,10 @@ class Wire():
         self.maxx = maxx
         self.miny = miny
         self.maxy = maxy
+        print "%3.2f\tWire._find_extremes" %(time.time()-start)
 
     def track (self, grid):
+        start = time.time()
         # Fill in positions in the grid tracked by this wire
         x = grid.oX
         y = grid.oY
@@ -122,6 +137,8 @@ class Wire():
         # Don't fill in the starting location (0,0)
         for instr in self.rpath:
             x, y = self._track_instruction(instr, grid, x, y)
+
+        print "%3.2f\tWire.track" %(time.time()-start)
 
     def _track_instruction (self, instr, grid, x, y):
         # Fill out positions covered by this instruction, starting from x,y
@@ -154,7 +171,6 @@ class Wire():
 
 
 def test (wire1_string, wire2_string, em=None, ed=None):
-    Wire.reset_keys()
     print
 
     print wire1_string
@@ -166,6 +182,7 @@ def test (wire1_string, wire2_string, em=None, ed=None):
     if em is not None: assert(m == em)
     if ed is not None: assert(d == ed)
 
+    Wire.reset_keys()
 
 def tests ():
     # Example 1
@@ -190,3 +207,4 @@ wire1 = Wire("R993,U847,R868,D286,L665,D860,R823,U934,L341,U49,R762,D480,R899,D2
 wire2 = Wire("L1002,D658,L695,U170,L117,U93,R700,D960,L631,U483,L640,D699,R865,U886,L59,D795,R265,U803,R705,D580,R519,U685,R126,D888,R498,U934,L980,U734,L91,D50,R805,U197,R730,U363,R337,U594,L666,U702,L237,D140,L72,U980,L167,U598,L726,U497,L340,D477,L304,U945,R956,U113,L43,D4,R890,D316,R916,D644,R704,D398,L905,U361,R420,U31,L317,U338,R703,D211,R27,D477,L746,U813,R705,U191,L504,D434,R697,D945,R835,D374,L512,U269,L299,U448,R715,U363,R266,U720,L611,U672,L509,D983,L21,U895,L340,D794,R528,U603,R154,D610,L582,U420,L696,U599,R16,U610,L134,D533,R156,D338,L761,U49,L335,D238,R146,U97,L997,U545,L896,D855,L653,D789,R516,D371,L99,D731,R868,D182,R535,D35,R190,D618,R10,D694,L567,D17,R356,U820,R671,D883,R807,U218,L738,U225,L145,D954,R588,U505,R108,U178,R993,D788,R302,D951,R697,D576,L324,U930,R248,D245,R622,U323,R667,U876,L987,D411,L989,U915,R157,D67,L968,U61,R274,D189,L53,D133,R617,D958,L379,U563,L448,D412,R940,U12,R885,U121,R746,U215,R420,U346,L469,D839,R964,D273,R265,D3,L714,D224,L177,U194,L573,U511,L795,U299,L311,U923,R815,U594,L654,U326,L547,U547,R467,D937,L174,U453,R635,D551,L365,U355,R658,U996,R458,D623,R61,U181,R340,U163,L329,D496,L787,D335,L37,D565,R318,U942,R198,U85,R328,D826,R817,D118,R138,D29,L434,D427,R222,D866,L10,D152,R822,D779,L900,D307,R723,D363,L715,D60,R661,U680,R782,U789,R311,D36,R425,U498,L910,D546,R394,D52,R803,D168,L6,U769,R856,D999,L786,U695,R568,U236,R472,U291,L530,U314,L251,D598,R648,D475,L132,D236,L915,D695,L700,U378,L685,D240,R924,D977,R627,U824,L165")
 
 print closest_crossing(wire1, wire2)
+
