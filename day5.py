@@ -356,9 +356,9 @@ def test_day5_2_tests ():
     test(program, inputs=[9],output="1001")
 
 def tests ():
-    #test_day2()
-    #test_day5_1_examples()
-    #test_day5_1_puzzle()
+    test_day2()
+    test_day5_1_examples()
+    test_day5_1_puzzle()
     test_day5_2_tests()
 
     print("All tests passed")
