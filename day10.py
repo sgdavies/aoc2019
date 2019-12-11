@@ -1,3 +1,6 @@
+import cmath
+DEBUG=False
+
 class AsteroidMap:
     def __init__ (self, map_str):
         self._best_location = None
@@ -44,10 +47,8 @@ class AsteroidMap:
         # remove any that are shadowed from the set
         # find size of remaining set and save the value
         for asteroid in self.the_map.keys():
-            visibles = set(self.the_map.keys())
-            visibles.remove(asteroid)
+            visibles = self.get_visibles(asteroid)
 
-            self.remove_shadowed(asteroid, visibles)
 
             self.the_map[asteroid] = len(visibles)
 
@@ -58,6 +59,37 @@ class AsteroidMap:
             if location[1] > self._best_value:
                 self._best_location = location[0]
                 self._best_value = location[1]
+
+    def get_visibles(self, asteroid):
+        visibles = set(self.the_map.keys())
+        visibles.remove(asteroid)
+
+        self.remove_shadowed(asteroid, visibles)
+
+        return visibles
+
+    def order_asteroids(self, this_asteroid, asteroids):
+        # Assumes asteroids are only visible ones (otherwise ordering of lined-up ones is arbitrary)
+        order_dict = {}
+        for other_asteroid in asteroids:
+            _,_,dx,dy = self.get_dx_dy(this_asteroid, other_asteroid)
+            phi = cmath.polar(complex(dx,dy))[1]
+            order_dict[phi] = other_asteroid
+
+        # order by phi
+        # ordering works out ok - this orders anticlockwise, but our map is
+        # flipped (y at the top) so actually this comes out as clockwise after all
+        ordered_asteroids = [(k,order_dict[k]) for k in sorted(order_dict.keys())]
+
+        if DEBUG: print "before switching:",ordered_asteroids
+        # Move to back until the first one is straight up (or clockwise from that)
+        # Remember up is negative (y=0 at the top)
+        while ordered_asteroids[0][0] < -cmath.pi/2:
+            ordered_asteroids.append(ordered_asteroids.pop(0))
+
+        if DEBUG: print "after switching:",ordered_asteroids
+        return [elem[1] for elem in ordered_asteroids]
+
 
     def remove_shadowed(self, asteroid, visible_set):
         # Remove any asteroids from the visible set that are not visible to
@@ -71,9 +103,10 @@ class AsteroidMap:
                 continue   # Don't bother counting shadows for something
                            # that's already in a shadow
 
-            ox, oy = other_asteroid[0], other_asteroid[1]
-            dx = ox - asteroid[0]
-            dy = oy - asteroid[1]
+            ox,oy,dx,dy = self.get_dx_dy(asteroid, other_asteroid)
+            #ox, oy = other_asteroid[0], other_asteroid[1]
+            #dx = ox - asteroid[0]
+            #dy = oy - asteroid[1]
             ldx, ldy = self.shrink_vector(dx, dy)
 
             x = ox + ldx
@@ -84,6 +117,14 @@ class AsteroidMap:
 
                 x += ldx
                 y += ldy
+
+    def get_dx_dy (self, this_asteroid, other_asteroid):
+        # Returns the other asteroid's coords, and the deltas between than and this one
+        ox, oy = other_asteroid[0], other_asteroid[1]
+        dx = ox - this_asteroid[0]
+        dy = oy - this_asteroid[1]
+
+        return ox, oy, dx, dy
 
     def shrink_vector(self, x, y):
         # Reduce vecxtor to its minimal representation
@@ -115,6 +156,29 @@ class AsteroidMap:
 
         return self._best_value
 
+def find_Nth_vaporized (the_map, asteroid, N):
+    #print "Finding {}th asteroid eliminated, from base at".format(N), asteroid
+    vaporized = []
+    asteroid_map = AsteroidMap(the_map)
+
+    if DEBUG:
+        print asteroid_map.the_map
+        print asteroid_map.display()
+    assert(asteroid in asteroid_map.the_map)
+
+    while len(vaporized) < N:
+        visibles = asteroid_map.get_visibles(asteroid)
+        if DEBUG: print "Visible:", visibles
+        assert(asteroid not in visibles)
+        visibles = asteroid_map.order_asteroids(asteroid, visibles)
+        if DEBUG: print "Ordered:", visibles
+
+        for target in visibles:
+            #if DEBUG: print target
+            vaporized.append(target)
+            asteroid_map.the_map.pop(target)
+
+    return vaporized[N-1]
 
 
 def tests ():
@@ -202,7 +266,7 @@ def tests ():
     assert(map_3.best_value() == 41)
 
     # Larger example 4
-    map_4 = AsteroidMap(""".#..##.###...#######
+    map_4_str = """.#..##.###...#######
 ##.############..##.
 .#.######.########.#
 .###.#######.####.#.
@@ -221,7 +285,8 @@ def tests ():
 ....##.##.###..#####
 .#.#.###########.###
 #.#.#.#####.####.###
-###.##.####.##.#..##""")
+###.##.####.##.#..##"""
+    map_4 = AsteroidMap(map_4_str)
 
     assert(map_4.best_location() == (11,13))
     assert(map_4.best_value() == 210)
@@ -255,7 +320,27 @@ def tests ():
     assert(asteroids.best_location() == (14,17))
     assert(asteroids.best_value() == 260)
 
+    # Part 2
+    test_map = """.#.
+###
+.#."""
+    assert(find_Nth_vaporized(test_map, (1,1), 1) == (1,0))
+
+    mapp = """.#....#####...#..
+##...##.#####..##
+##...#...#.#####.
+..#.....#...###..
+..#.#.....#....##"""
+    assert(find_Nth_vaporized(mapp, (8,3), 1) == (8,1))
+    assert(find_Nth_vaporized(mapp, (8,3), 2) == (9,0))
+    assert(find_Nth_vaporized(mapp, (8,3), 27) == (5,1))
+
+    # Larger example
+    assert(find_Nth_vaporized(map_4_str, (11,13), 200) == (8,2))
+
+    x,y = find_Nth_vaporized(input_data, (14,17), 200)
+    assert(100*x + y == 608)
+
     print("All tests passed")
 
 tests()
-
