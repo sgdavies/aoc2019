@@ -461,15 +461,20 @@ def day7part1fun(program, aa,bb,cc,dd,ee):
 def day7part2fun(program, aa,bb,cc,dd,ee):
     # Assumes loop runs through more than once
     ampA = Program(program, inputs=[aa, 0], pause_on_output=True)
-    outA = ampA.run()
+    outA, stopped = ampA.run()
+    assert (not stopped)
     ampB = Program(program, inputs=[bb, outA], pause_on_output=True)
-    outB = ampB.run()
+    outB, stopped = ampB.run()
+    assert (not stopped)
     ampC = Program(program, inputs=[cc, outB], pause_on_output=True)
-    outC = ampC.run()
+    outC, stopped = ampC.run()
+    assert (not stopped)
     ampD = Program(program, inputs=[dd, outC], pause_on_output=True)
-    outD = ampD.run()
+    outD, stopped = ampD.run()
+    assert (not stopped)
     ampE = Program(program, inputs=[ee, outD], pause_on_output=True)
-    outE = ampE.run()
+    outE, stopped = ampE.run()
+    assert (not stopped)
 
     finalE = outE
 
@@ -481,7 +486,7 @@ def day7part2fun(program, aa,bb,cc,dd,ee):
             halting = True
 
         if outA: ampB.inputs.append(outA)
-        outB. b_stopped = ampB.run()
+        outB, b_stopped = ampB.run()
         if halting:
             assert(b_stopped)
 
@@ -549,7 +554,7 @@ def tests ():
     test_day5_2_tests()
     test_day5_2_puzzle()
     # Slow test
-    #BROKEN#test_day7()
+    test_day7()
 
     # Very slow test (6 seconds)
     #SKIP#test_day_9()
@@ -589,20 +594,15 @@ def advance(location, facing):
     return location
 
 # Start here
-# start on white
-grid[robot_location] = 1
+grid[robot_location] = 1  # Start on white
 read_camera(robot_location, grid, brain)
 stop = False
 
 while not stop:
     color, stop = brain.run()  # Stops on output
-    #assert (not stop)
     if stop:
-        #print color
-        #print robot_location
-        #print robot_location in grid
-        if color is None: break
-        # else: paint, and the loop will end next turn anyway
+        assert (color is None)
+        break
 
     grid[robot_location] = color
 
@@ -613,17 +613,16 @@ while not stop:
 
     read_camera(robot_location, grid, brain)
 
-#print grid
 print len(grid)
 
 def pretty_print_grid (grid):
-    minx = min([a[0] for a in grid.keys()]) -1
-    maxx = max([a[0] for a in grid.keys()]) +1
-    miny = min([a[1] for a in grid.keys()]) -1
-    maxy = max([a[1] for a in grid.keys()]) +1
+    minx = min([a[0] for a in grid.keys()])
+    maxx = max([a[0] for a in grid.keys()])
+    miny = min([a[1] for a in grid.keys()])
+    maxy = max([a[1] for a in grid.keys()])
 
-    width = maxx-minx
-    height = maxy-miny
+    width = maxx-minx +1  # Extra 1 for the origin
+    height = maxy-miny +1
 
     out=[]
     for y in range(height):
@@ -633,7 +632,6 @@ def pretty_print_grid (grid):
         #print item
         if grid[location]:  # 1=white
             out[ location[1] -miny ][ location[0] -minx ] = '#'
-            #out[ item[0][1] -miny ][ item[0][0] -minx ] = '#'
 
     print "\n".join(["".join([str(s) for s in row]) for row in out])
 
