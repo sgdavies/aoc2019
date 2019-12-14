@@ -34,39 +34,39 @@ class Instruction:
 
         if DEBUG: print(self.__class__.__name__)
 
-    def get_params (self, program):
+    def get_params (self, computer):
         if self._params is None:
             self._decode_modes()
-            self._params = self._get_params(program)
+            self._params = self._get_params(computer)
 
         return self._params
 
-    def _get_params (self, program):
+    def _get_params (self, computer):
         # override in child class
         assert(False)
 
-    def _get_single_param (self, program, ip):
-        p = program.get(ip)
-        return self._maybe_deref(p, program)
+    def _get_single_param (self, computer, ip):
+        p = computer.get(ip)
+        return self._maybe_deref(p, computer)
 
-    def _maybe_deref (self, param, program):
+    def _maybe_deref (self, param, computer):
         # Only works if params are called in order!
         m = self.modes.pop(0) if self.modes else 0
 
         if m == 0:
             # position mode
-            return program.get(param)
+            return computer.get(param)
         elif m == 1:
             # immediate mode
             return param
         elif m == 2:
             # relative base mode
-            return program.get(program.relative_base + param)
+            return computer.get(computer.relative_base + param)
         else:
             print ("Unknown mode:", m)
             assert(False)
 
-    def execute (self, program):
+    def execute (self, computer):
         # Must override in child class
         # returns (new ip, continue)
         assert(False)
@@ -82,26 +82,26 @@ class Instruction:
 class CombineTwoInstr(Instruction):
     # Use default init method
 
-    def execute (self, program):
+    def execute (self, computer):
         # Execute this instruction, modifying the passed-in memory
-        p1,p2,p3 = self.get_params(program)
+        p1,p2,p3 = self.get_params(computer)
 
-        program.store(self.combine(p1,p2), p3)
-        return program.ip+4, True
+        computer.store(self.combine(p1,p2), p3)
+        return computer.ip+4, True
 
     def combine (self, p1, p2):
         # override in child class
         assert(False)
 
-    def _get_params (self, program):
+    def _get_params (self, computer):
         # Add or multiply - process 2 params and store at 3rd
         # Three parameters, starting from the next position after the ip
-        p1 = self._get_single_param(program, program.ip+1)
-        p2 = self._get_single_param(program, program.ip+2)
+        p1 = self._get_single_param(computer, computer.ip+1)
+        p2 = self._get_single_param(computer, computer.ip+2)
 
-        p3 = program.get(program.ip+3)
+        p3 = computer.get(computer.ip+3)
         m = self.modes.pop(0) if self.modes else 0
-        if m == 2: p3 = p3 + program.relative_base
+        if m == 2: p3 = p3 + computer.relative_base
 
         return (p1, p2, p3)
 
@@ -121,62 +121,62 @@ class MultInstr(CombineTwoInstr):
 
 class InputInstr(Instruction):
 
-    def execute (self, program):
+    def execute (self, computer):
         #assert(len(self.modes) == 1)
         mode = self.modes
 
-        val = program.inputs.pop(0)
+        val = computer.inputs.pop(0)
 
         if DEBUG: print("mode:", mode, " val:", val)
 
         if mode == 0 or mode == 1:
             # Store the val at the address stored in the param
-            loc = program.get(program.ip +1)
+            loc = computer.get(computer.ip +1)
         elif mode == 2:
-            loc = program.get(program.ip +1) + program.relative_base
+            loc = computer.get(computer.ip +1) + computer.relative_base
         else:
             print("unknown input mode:", mode)
             assert(False)
 
-        program.store(val,loc)
+        computer.store(val,loc)
 
-        return program.ip+2, True
+        return computer.ip+2, True
 
 class OutputInstr(Instruction):
     # Dummy showing which methods definitely need overriding
-    def execute (self, program):
-        val = self.get_params(program)[0]
-        program.append_to_output(val)
-        return program.ip+2, True
+    def execute (self, computer):
+        val = self.get_params(computer)[0]
+        computer.append_to_output(val)
+        return computer.ip+2, True
 
-    def _get_params(self, program):
-        p = self._get_single_param(program, program.ip+1)
+    def _get_params(self, computer):
+        p = self._get_single_param(computer, computer.ip+1)
         return (p, )
 
 class TerminateInstr(Instruction):
     # Dummy showing which methods definitely need overriding
-    def execute (self, program):
-        return program.ip+1, False
+    def execute (self, computer):
+        return computer.ip+1, False
 
-    def _get_params (self, program):
+    def _get_params (self, computer):
         return (None,)
 
 class JumpIfInstr(Instruction):
-    def execute (self, program):
-        test_val, ip_val = self.get_params(program)
+    def execute (self, computer):
+        test_val, ip_val = self.get_params(computer)
 
         if self.do_test(test_val):
             next_ip = ip_val
         else:
-            next_ip = program.ip +3  # Opcode, test val, next ip val
+            next_ip = computer.ip +3  # Opcode, test val, next ip val
 
         if DEBUG: print(self.__class__.__name__, test_val, ip_val, "->", next_ip)
         return next_ip, True
 
-    def _get_params (self, program):
-        ip = program.ip
+    def _get_params (self, computer):
+        ip = computer.ip
 
-        return (self._get_single_param(program, ip+1), self._get_single_param(program, ip+2))
+        return (self._get_single_param(computer, ip+1), self._get_single_param(computer, ip+2))
 
 class JitInstr(JumpIfInstr):
     # Jump if true.  If first param is non-zero, set ip to value from second param
@@ -190,24 +190,24 @@ class JifInstr(JumpIfInstr):
 
 class CompareInstr(Instruction):
     # Compare two values, and store the results in the third location
-    def execute (self, program):
-        t1, t2, loc = self.get_params(program)
+    def execute (self, computer):
+        t1, t2, loc = self.get_params(computer)
 
         if self._compare(t1,t2):
             val = 1
         else:
             val = 0
 
-        program.store(val, loc)
-        return program.ip+4, True  # instruction, 2 params to compare, 1 store
+        computer.store(val, loc)
+        return computer.ip+4, True  # instruction, 2 params to compare, 1 store
 
-    def _get_params (self, program):
-        p1 = self._get_single_param(program, program.ip+1)
-        p2 = self._get_single_param(program, program.ip+2)
+    def _get_params (self, computer):
+        p1 = self._get_single_param(computer, computer.ip+1)
+        p2 = self._get_single_param(computer, computer.ip+2)
 
-        p3 = program.get(program.ip+3)
+        p3 = computer.get(computer.ip+3)
         m = self.modes.pop(0) if self.modes else 0
-        if m == 2: p3 = p3 + program.relative_base
+        if m == 2: p3 = p3 + computer.relative_base
 
         return (p1, p2, p3)
 
@@ -224,22 +224,22 @@ class EqInstr(CompareInstr):
         return a == b
 
 class RelBaseInstr(Instruction):
-    def execute (self, program):
-        program.relative_base += self.get_params(program)[0]
-        if DEBUG: print("Relbase is now", program.relative_base)
-        return program.ip+2, True
+    def execute (self, computer):
+        computer.relative_base += self.get_params(computer)[0]
+        if DEBUG: print("Relbase is now", computer.relative_base)
+        return computer.ip+2, True
 
-    def _get_params (self, program):
-        p1 = self._get_single_param(program, program.ip+1)
+    def _get_params (self, computer):
+        p1 = self._get_single_param(computer, computer.ip+1)
         return (p1, )
 
 class TemplateInstr(Instruction):
     # Dummy showing which methods definitely need overriding
-    def execute (self, program):
+    def execute (self, computer):
         # TODO
         return next_ip, True
 
-    def _get_params (self, program):
+    def _get_params (self, computer):
         # TODO figure out what params you need
         return (p1, p2, )
 
@@ -341,12 +341,12 @@ def test_day2 ():
     #Computer([1,1,1,4,99, 5,6,0,99]).test([30,1,1,4,2,5,6,0,99])
     test([1,1,1,4,99, 5,6,0,99], expected_mem = [30,1,1,4,2,5,6,0,99])
 
-    #program = Computer([1,0,0,3,1,1,2,3,1,3,4,3,1,5,0,3,2,10,1,19,1,5,19,23,1,23,5,27,1,27,13,31,1,31,5,35,1,9,35,39,2,13,39,43,1,43,10,47,1,47,13,51,2,10,51,55,1,55,5,59,1,59,5,63,1,63,13,67,1,13,67,71,1,71,10,75,1,6,75,79,1,6,79,83,2,10,83,87,1,87,5,91,1,5,91,95,2,95,10,99,1,9,99,103,1,103,13,107,2,10,107,111,2,13,111,115,1,6,115,119,1,119,10,123,2,9,123,127,2,127,9,131,1,131,10,135,1,135,2,139,1,10,139,0,99,2,0,14,0])
-    #program.set(1,12)
-    #program.set(2,2)
-    #program.run()
-    #print program.get(0)
-    #assert(program.get(0) == 3562624)
+    #computer = Computer([1,0,0,3,1,1,2,3,1,3,4,3,1,5,0,3,2,10,1,19,1,5,19,23,1,23,5,27,1,27,13,31,1,31,5,35,1,9,35,39,2,13,39,43,1,43,10,47,1,47,13,51,2,10,51,55,1,55,5,59,1,59,5,63,1,63,13,67,1,13,67,71,1,71,10,75,1,6,75,79,1,6,79,83,2,10,83,87,1,87,5,91,1,5,91,95,2,95,10,99,1,9,99,103,1,103,13,107,2,10,107,111,2,13,111,115,1,6,115,119,1,119,10,123,2,9,123,127,2,127,9,131,1,131,10,135,1,135,2,139,1,10,139,0,99,2,0,14,0])
+    #computer.set(1,12)
+    #computer.set(2,2)
+    #computer.run()
+    #print computer.get(0)
+    #assert(computer.get(0) == 3562624)
     test([1, 12,2, 3,1,1,2,3,1,3,4,3,1,5,0,3,2,10,1,19,1,5,19,23,1,23,5,27,1,27,13,31,1,31,5,35,1,9,35,39,2,13,39,43,1,43,10,47,1,47,13,51,2,10,51,55,1,55,5,59,1,59,5,63,1,63,13,67,1,13,67,71,1,71,10,75,1,6,75,79,1,6,79,83,2,10,83,87,1,87,5,91,1,5,91,95,2,95,10,99,1,9,99,103,1,103,13,107,2,10,107,111,2,13,111,115,1,6,115,119,1,119,10,123,2,9,123,127,2,127,9,131,1,131,10,135,1,135,2,139,1,10,139,0,99,2,0,14,0],
          expected_mem = [3562624], expected_mem_len=1)
 
