@@ -1,4 +1,5 @@
 from asciimatics.screen import Screen, ManagedScreen
+from asciimatics.event import KeyboardEvent
 from computer import Computer
 import time
 
@@ -22,21 +23,40 @@ ys = [pos[1] for pos in screen.keys()]
 score = 0
 screen_out = []
 TILE = { 0 : (" ", Screen.COLOUR_BLACK),
-         1 : ("#", Screen.COLOUR_WHITE),
-         2 : ("U", Screen.COLOUR_BLUE), 
+         1 : ("#", Screen.COLOUR_BLUE),
+         2 : ("U", Screen.COLOUR_CYAN), 
          3 : ("=", Screen.COLOUR_YELLOW), 
          4 : ("o", Screen.COLOUR_RED)
        }
 
+minx, maxx = min(xs), max(xs)
+miny, maxy = min(ys), max(ys)
 with ManagedScreen() as display:
-    for y in range(min(ys), max(ys)+1):
-        for x in range(min(xs), max(xs)+1):
+    for y in range(miny, maxy+1):
+        for x in range(minx, maxx+1):
             if (x,y) in screen:
                 ch, color = TILE[screen[(x,y)]]
                 display.print_at(ch, x, y, color)
-    display.print_at("Score: {}".format(score), 0, max(ys)+2, Screen.COLOUR_GREEN)
+    display.print_at("Score: {}".format(score), 0, maxy+2, Screen.COLOUR_GREEN)
+    LAST_KEYPRESS = "Last keypress:"
+    display.print_at(LAST_KEYPRESS, maxx - len(LAST_KEYPRESS) -6, maxy+2, Screen.COLOUR_MAGENTA)
     display.refresh()
-    time.sleep(5)
+
+    while True:
+        ev = display.get_event()
+        if ev and isinstance(ev, KeyboardEvent):
+            key_code = ev.key_code
+            if key_code == -203:
+                k = "Left"
+            elif key_code == -205:
+                k = "Right"
+            else:
+                k = str(key_code)
+            display.print_at(k, maxx -5, maxy+2, Screen.COLOUR_MAGENTA)
+        else:
+            display.print_at("     ", maxx -5, maxy+2, Screen.COLOUR_MAGENTA)
+        display.refresh()
+        time.sleep(0.2)
 
 print(len([tile for tile in screen.values() if tile==2]))
 
