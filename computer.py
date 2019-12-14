@@ -245,10 +245,14 @@ class TemplateInstr(Instruction):
 
 
 class Computer:
-    def __init__ (self, initial_memory_state, inputs=[], pause_on_output=False):
+    def __init__ (self, initial_memory_state, inputs=[], input_fun=None, pause_on_output=False):
+        if inputs and input_fun:
+            print("Invalid - define either inputs array or inputs function, not both")
+            assert(False)
         self.memory = list(initial_memory_state)
         self.ip = 0
         self.inputs = inputs
+        self.input_fun = input_fun
         self.output_buffer = []
         self.new_output = False
         self.pause_on_output = pause_on_output
@@ -275,7 +279,10 @@ class Computer:
             self.memory.append(0)
 
     def get_input(self):
-        return self.inputs.pop(0)
+        if self.input_fun:
+            return self.input_fun()
+        else:
+            return self.inputs.pop(0)
 
     def run(self):
         if DEBUG: print("Starting prog:\t", self.memory,"\n  with inputs:\t", self.inputs)
@@ -315,8 +322,8 @@ class Computer:
             print(self.ip)
             print()
 
-def test (program, inputs=None, output=None, expected_mem=None, expected_mem_len=None):
-    p = Computer(program, inputs=inputs)
+def test (program, inputs=None, input_fun=None, output=None, expected_mem=None, expected_mem_len=None):
+    p = Computer(program, inputs=inputs, input_fun=input_fun)
     p_out = p.run()
 
     if output:
@@ -365,6 +372,10 @@ def test_day5_1_examples ():
     #p.test([3,77,4,1,99])
     #assert(p.output_buffer == "77")
     test([3,1,4,1,99], inputs=[77], output="77")
+
+    # With input function
+    def input77(): return 77
+    test([3,1,4,1,99], input_fun=input77, output="77")
 
 def test_day5_1_puzzle():
     # Day 5.1 puzzle
