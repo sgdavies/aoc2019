@@ -125,7 +125,7 @@ class InputInstr(Instruction):
         #assert(len(self.modes) == 1)
         mode = self.modes
 
-        val = computer.inputs.pop(0)
+        val = computer.get_input()
 
         if DEBUG: print("mode:", mode, " val:", val)
 
@@ -273,6 +273,9 @@ class Computer:
     def _check_or_extend_memory(self, loc):
         while loc >= len(self.memory):
             self.memory.append(0)
+
+    def get_input(self):
+        return self.inputs.pop(0)
 
     def run(self):
         if DEBUG: print("Starting prog:\t", self.memory,"\n  with inputs:\t", self.inputs)
