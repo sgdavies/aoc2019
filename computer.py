@@ -248,6 +248,8 @@ class Computer:
     def __init__ (self, initial_memory_state, inputs=[], input_fun=None, pause_on_output=False):
         if inputs and input_fun:
             print("Invalid - define either inputs array or inputs function, not both")
+            print(inputs)
+            print(input_fun)
             assert(False)
         self.memory = list(initial_memory_state)
         self.ip = 0
@@ -656,4 +658,5 @@ def tests ():
 
     print("All tests passed")
 
-tests()
+if __name__ == "__main__":
+    tests()
