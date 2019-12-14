@@ -633,11 +633,12 @@ def tests ():
     test_day5_1_puzzle()
     test_day5_2_tests()
     test_day5_2_puzzle()
-    # Slow test
     test_day7()
 
-    # Very slow test (6 seconds)
-    #SKIP#test_day_9()
+    # Slow test (6 seconds)
+    #test_day_9()
+
+    test11_robot()
 
     print("All tests passed")
 
