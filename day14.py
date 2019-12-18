@@ -232,7 +232,7 @@ def tests():
 4 C, 1 A => 1 CA
 2 AB, 3 BC, 4 CA => 1 FUEL""", 165)
 
-    test_recipe("""157 ORE => 5 NZVS
+    recipe_13312 = """157 ORE => 5 NZVS
 165 ORE => 6 DCFZ
 44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
 12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
@@ -240,9 +240,10 @@ def tests():
 177 ORE => 5 HKGWZ
 7 DCFZ, 7 PSHF => 2 XJWVT
 165 ORE => 2 GPVTF
-3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT""", 13312)
+3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT"""
+    test_recipe(recipe_13312, 13312)
 
-    test_recipe("""2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
+    recipe_180697 = """2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
 17 NVRVD, 3 JNWZP => 8 VPVL
 53 STKFG, 6 MNCFX, 46 VJHF, 81 HVMC, 68 CXFTF, 25 GNMV => 1 FUEL
 22 VJHF, 37 MNCFX => 5 FWMGM
@@ -253,9 +254,10 @@ def tests():
 145 ORE => 6 MNCFX
 1 NVRVD => 8 CXFTF
 1 VJHF, 6 MNCFX => 4 RFSQX
-176 ORE => 6 VJHF""", 180697)
+176 ORE => 6 VJHF"""
+    test_recipe(recipe_180697, 180697)
 
-    test_recipe("""171 ORE => 8 CNZTR
+    recipe_2210736 = """171 ORE => 8 CNZTR
 7 ZLQW, 3 BMBT, 9 XCVML, 26 XMNCP, 1 WPTQ, 2 MZWV, 1 RJRHP => 4 PLWSL
 114 ORE => 4 BHXH
 14 VRPVC => 6 BMBT
@@ -271,7 +273,8 @@ def tests():
 3 BHXH, 2 VRPVC => 7 MZWV
 121 ORE => 7 VRPVC
 7 XCVML => 6 RJRHP
-5 BHXH, 4 VRPVC => 5 LTCX""", 2210736)
+5 BHXH, 4 VRPVC => 5 LTCX"""
+    test_recipe(recipe_2210736, 2210736)
 
     part_one_recipe="""1 BNZK => 2 NMDF
 3 KPQPD => 4 GSRWZ
@@ -332,6 +335,15 @@ def tests():
 
     test_recipe(part_one_recipe, 198984)
 
+    # Part 2
+    ONE_TRILLION = 1000000000000
+    #assert(fuel_for_ore(recipe_13312, ONE_TRILLION) == 82892753)
+    #assert(fuel_for_ore(recipe_180697, ONE_TRILLION) == 5586022)
+    #assert(fuel_for_ore(recipe_2210736, ONE_TRILLION) == 460664)
+
     print("All tests passed")
+
+    # Part 2 - need to find how much ORE was left over to generate 1 FUEL
+    #print(fuel_for_ore(part_one_recipe, ONE_TRILLION))
 
 tests()
