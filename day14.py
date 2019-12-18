@@ -171,41 +171,6 @@ def get_more_order(a_list, source_dict):
 
     return new_lists
 
-# def ore_for_ingredient(ingredient, how_many, source_dict, known_recipes):
-#     # This is wrong - it rounds up each time you want e.g. 7A->10, but instead we
-#     # want to work out total A needed for everything, then map 28A -> 3*10
-
-# 	# recursively find the ore needed to make the ingredients to make the ingredients to make ... &c
-# 	# Handle the fact that some recipes make more than one output (eg. 1A + 2B = 5C)
-# 	# Examples
-# 	# 9 ORE => 2 A so A:(2,[(9,ORE)])
-#     # 8 ORE => 3 B so B:(3,[(8,ORE)])
-#     # 7 ORE => 5 C so C:(5,[(7,ORE)])
-#     # 3 A, 4 B => 1 AB so AB:(1,[(3,A), (4,B)])
-#     # Or (example 1)
-#     # 10 ORE => 10 A so A:(10,[(10,ORE)])
-#     # <...>
-#     # 7 A, 1 E => 1 FUEL so FUEL:(1,[(7,A), (1,E)])
-#     #import pdb; pdb.set_trace()
-#     if ingredient=="ORE":
-#         return how_many
-#     elif (how_many, ingredient) in known_recipes:
-#         return known_recipes[(how_many, ingredient)]
-
-#     number, ingredients = source_dict[ingredient]  # e.g. 10, [(10,ORE)]
-
-#     sum_ore = 0
-#     for num, ing in ingredients:
-#         ore = ore_for_ingredient(ing, num, source_dict, known_recipes)
-#         sum_ore += ore
-
-#     repeats = math.ceil(how_many / number)
-
-#     ore_needed = sum_ore*repeats
-#     if DEBUG: print(ore_needed, ingredient, how_many)
-#     known_recipes[(how_many, ingredient)] = ore_needed
-#     return ore_needed
-
 def test_recipe(recipe, expected_ore):
     start = time.time()
     ore_needed = ore_for_recipe(recipe)
