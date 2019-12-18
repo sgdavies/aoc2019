@@ -1,7 +1,7 @@
 import math, time
 DEBUG=0
 
-def ore_for_recipe(recipe):
+def ore_for_recipe(recipe, fuel_number=1):
     source_dict = {}
 
     for line in recipe.split("\n"):
@@ -28,7 +28,7 @@ def ore_for_recipe(recipe):
     states = []
 
     try:
-        ore, ok = ore_for_list([(1,"FUEL")], 0, unused, source_dict, suggested_order, states)
+        ore, ok = ore_for_list([(fuel_number,"FUEL")], 0, unused, source_dict, suggested_order, states)
     except Exception as ex:
         import traceback; print(traceback.format_exc())
         import pdb; pdb.set_trace()
@@ -171,16 +171,56 @@ def get_more_order(a_list, source_dict):
 
     return new_lists
 
-def test_recipe(recipe, expected_ore):
+def fuel_for_ore(recipe, ore_amount):
+    # Find out how much fuel you can make with a specified amount of ore
+    # First - how much for 1 fuel?
+    ore_for_one = ore_for_recipe(recipe)
+
+    if ore_amount < ore_for_one:
+        if DEBUG: print("Not enough ore for a single fuel :-( ({} < {})".format(ore_amount, ore_for_one))
+        return 0
+
+    lower_bound_fuel = ore_amount // ore_for_one  # If there are no spares, we can make at least this many fuel
+    lower_bound_ore = ore_for_recipe(recipe, fuel_number=lower_bound_fuel)
+
+    upper_bound_fuel = int(1.1*lower_bound_fuel)
+
+    while ore_for_recipe(recipe, fuel_number=upper_bound_fuel) < ore_amount:
+        lower_bound_fuel = upper_bound_fuel
+        upper_bound_fuel = int(1.1*upper_bound_fuel)
+
+    # Now do a binary chop for target<=ore_amount
+    while True:
+        mid_fuel = (lower_bound_fuel + upper_bound_fuel) // 2
+
+        if mid_fuel==lower_bound_fuel:
+            # Nothing left to split
+            return lower_bound_fuel
+
+        mid_ore = ore_for_recipe(recipe, fuel_number=mid_fuel)
+
+        if mid_ore < ore_amount:
+            lower_bound_fuel = mid_fuel
+        elif mid_ore > ore_amount:
+            upper_bound_fuel = mid_fuel
+        else:
+            # On the button!
+            return mid_fuel
+
+def test_recipe(recipe, expected_ore, fuel_number=1):
     start = time.time()
-    ore_needed = ore_for_recipe(recipe)
+    ore_needed = ore_for_recipe(recipe, fuel_number)
     if DEBUG or True: print("Test: {} vs {} - took {:.1f}s".format(ore_needed, expected_ore, time.time()-start))
     assert(ore_needed == expected_ore)
 
 def tests():
     test_recipe("""10 ORE => 10 A
 1 ORE => 1 B
-7 A, 1 B => 1 FUEL""", 11)
+2 A, 1 B => 1 FUEL""", 11)
+
+    test_recipe("""10 ORE => 10 A
+1 ORE => 1 B
+2 A, 1 B => 1 FUEL""", 12, fuel_number=2)
 
     test_recipe("""10 ORE => 10 A
 1 ORE => 1 B
@@ -302,13 +342,13 @@ def tests():
 
     # Part 2
     ONE_TRILLION = 1000000000000
-    #assert(fuel_for_ore(recipe_13312, ONE_TRILLION) == 82892753)
-    #assert(fuel_for_ore(recipe_180697, ONE_TRILLION) == 5586022)
-    #assert(fuel_for_ore(recipe_2210736, ONE_TRILLION) == 460664)
+    assert(fuel_for_ore(recipe_13312, ONE_TRILLION) == 82892753)
+    assert(fuel_for_ore(recipe_180697, ONE_TRILLION) == 5586022)
+    assert(fuel_for_ore(recipe_2210736, ONE_TRILLION) == 460664)
 
     print("All tests passed")
 
     # Part 2 - need to find how much ORE was left over to generate 1 FUEL
-    #print(fuel_for_ore(part_one_recipe, ONE_TRILLION))
+    print(fuel_for_ore(part_one_recipe, ONE_TRILLION))
 
 tests()
