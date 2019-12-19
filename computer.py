@@ -287,6 +287,9 @@ class Computer:
             return self.inputs.pop(0)
 
     def run(self):
+        # If computer is in "pause_on_output" mode, run until there is an instruction or program
+        # halts, and return (output_val, halted) tuple
+        # Otherwise run until halting, and return the full output (as an array of numbers)
         if DEBUG: print("Starting prog:\t", self.memory,"\n  with inputs:\t", self.inputs)
         carry_on = True
         try:
