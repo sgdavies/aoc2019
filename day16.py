@@ -1,4 +1,5 @@
 DEBUG=False
+import time, sys
 
 PATTERNS = { 0: [0,1,0,-1]}
 def get_pattern(ix, desired_length):
@@ -41,18 +42,95 @@ def fft(input_signal, phases, start_position=0, length=8):
 
     return next_signal[start_position:start_position+length]
 
-def longer_fft(input_signal, phases):
-    output_position = int(input_signal[:8])
-    print("Will look for output at position:", output_position)
-    input_signal = input_signal*1000
+def fft_fast(input_signal, phases, start_position=0, length=8, all=False):
+    # Not O(N^2)
+    # Use patterns in output to generate next signal quickly
+    # E.g. signal length 10.
+    # - "Lx" = "sum of last x digits"
+    # - ^=1, v=-1
+    # ^0v0^0v0^0 L10-L9 -L8 +L7 +L6 -L5 -L4 +L3 +L2 -L1
+    # 0^^00vv00^ L9 -L7 -L5 +L3 +L1
+    # 00^^^000vv L8 -L5 -L2
+    # 000^^^^000 L7 -L3
+    # 0000^^^^^0 L6 -L1
+    # 00000^^^^^ L5
+    # 000000^^^^ L4
+    # 0000000^^^ L3
+    # 00000000^^ L2
+    # 000000000^ L1
+    #
+    # So algo is:
+    # start on final digit. Keep running sum of final N digits. Run through half the array doing this and adding to next signal.
+    # after N/2: diff = N/2, sigX = Lx -L(x-diff)
+    # row=1:N
+    # Lr = L(N-row+1)
+    # nextL = Lr - r (-r, -r, etc) giving Ls - e.g.           Ls = [5] or [8,5,2] or [9,7,5,3,1]
+    # Factors = [+,-,-,+] etc - i.e. [1,-1,-1,1][Ls-index %4] so   [1]   [1,-1,-1]  [1,-1,-1,1,1]
+    # Then zip/multiply and sum together
+    #
+    # Importantly, note that next_sig[Xn] only depends on sig[Xn, Xn+1, etc] - it never depends on smaller n
+    # So we don't need to bother calculating any next_sig values for n<start_position - just leave blank.
+    #
+    # import pdb; pdb.set_trace()
+    N = len(input_signal)
+    cap = N+1 - start_position
+    wave = []
+    while len(wave) < N:
+        wave += [1,-1,-1,1]
 
-    output_signal = fft(input_signal, phases)
-    return output_signal[output_position:output_position+1]
+    signal = [int(c) for c in input_signal]
+
+    for phase in range(phases):
+        # E.g. one phase of "12345678" gives "48226158"
+        next_signal = [None]*N
+        sumLs = {}
+        sumL = 0
+        for ix in range(1, cap):
+            sigix = N-ix  # Row index from the top, starting on 0
+            rowix = sigix+1 # Row index from top, starting on 1
+            sumL += signal[sigix]
+            sumLs[ix] = sumL
+            ls = []
+            lix = ix
+            while True:
+                ls.append(sumLs[lix])
+                lix -= rowix
+                if lix <= 0:
+                    break
+            combo = list(zip(ls, wave))
+            total = sum([a*b for a,b in combo])
+            next_signal[sigix] = int(str(total)[-1])
+
+        signal = next_signal
+
+    if all:
+        return "".join([str(x) for x in next_signal])
+    else:
+        return "".join([str(x) for x in next_signal[start_position:start_position+length]])
+
+
+def longer_fft(input_signal, repeats, phases):
+    output_position = int(input_signal[:7])
+    input_signal_long = input_signal*repeats
+
+    output_signal = fft_fast(input_signal_long, phases, all=True)
+    #return output_signal[output_position:output_position+1]
+    print("Input signal: {}\nRepeated {} times\tLooking for output at index {}".format(input_signal, repeats, output_position))
+    out = output_signal[output_position:output_position+8]
+    print("Output: {}".format(out))
+    # import pdb; pdb.set_trace()
+    return out
 
 def test(input_signal, phases, expected):
-    output = fft(input_signal, phases, length=len(expected))
-    if DEBUG: print(output, '\n', expected)
-    assert(output == expected)
+    start = time.time()
+    output_fft = fft(input_signal, phases, length=len(expected))
+    t1 = time.time() - start
+    start = time.time()
+    output_fft_fast = fft_fast(input_signal, phases, length=len(expected))
+    t2 = time.time() - start
+    if DEBUG: print("Expected: {}, got:\n{} ({:.2f}s) from fft\n{} ({:.2f}s) from fft_fast".format(expected, output_fft, t1, output_fft_fast, t2))
+    assert(output_fft == expected)
+    assert(output_fft_fast == expected)
 
 def tests():
     global DEBUG
@@ -103,4 +181,43 @@ tests()
 
 # check adding 0s on the end doesn't affect the answer:
 test("8087122458591454661908321864559500000000000000000000", 100, "24176176")
-print("Assumptions ok so far")
+# print("Assumptions ok so far")
+
+def timeit(fun, *args, **kwargs):
+    start = time.time()
+    ret = fun(*args, **kwargs)
+    return (time.time() - start), ret
+
+repeats = 10000
+
+testes = [ ("000000211111111", 2, "67409116"),
+           ("03036732577212944063491565474664", repeats, "84462026"),
+           ("02935109699940807407585447034323", repeats, "78725270"),
+           ("03081770884921959731165446850517", repeats, "53553731")]
+
+for imp_small, reps, expected in testes:
+    start_pos = int(imp_small[:7])
+    imp_long = imp_small*reps
+    # seconds, ans = timeit(longer_fft, imp_small, reps, 100)
+    seconds, ans = timeit(fft_fast, imp_long, 100, start_position=start_pos)
+    print("{:.0f} seconds for {}*{}".format(seconds, imp_small, reps)); sys.stdout.flush()
+    assert(ans == expected)
+    print("    -    -    -    -    -")
+
+# seconds, ans = timeit(longer_fft, part_one_iput, repeats, 100)
+start_pos = int(part_one_iput[:7])
+imp_long = part_one_iput*repeats
+seconds, ans = timeit(fft_fast, imp_long, 100, start_position=start_pos)
+print("{:.0f} seconds for the main puzzle!".format(seconds))
+print("Answer is:", ans)
+
+# outs = []
+# for mult in [1, 10, 20, 40, 60, 80, 100]:
+#     imp = imp_small*mult
+#     slow = timeit(fft, imp, 100)
+#     fast = timeit(fft_fast, imp, 100)
+#     outs.append((mult, slow, fast))
+#     print("Done {} : {:.1f} vs {:.1f}".format(mult, slow, fast)); sys.stdout.flush()
+
+# print(outs)
+# import pdb; pdb.set_trace()
