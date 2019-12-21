@@ -211,13 +211,4 @@ seconds, ans = timeit(fft_fast, imp_long, 100, start_position=start_pos)
 print("{:.0f} seconds for the main puzzle!".format(seconds))
 print("Answer is:", ans)
 
-# outs = []
-# for mult in [1, 10, 20, 40, 60, 80, 100]:
-#     imp = imp_small*mult
-#     slow = timeit(fft, imp, 100)
-#     fast = timeit(fft_fast, imp, 100)
-#     outs.append((mult, slow, fast))
-#     print("Done {} : {:.1f} vs {:.1f}".format(mult, slow, fast)); sys.stdout.flush()
-
-# print(outs)
-# import pdb; pdb.set_trace()
+# 28135104
