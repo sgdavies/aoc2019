@@ -1,4 +1,5 @@
 DEBUG=False
+import copy, random
 
 class Dungeon():
     def __init__(self, map_str):
@@ -36,13 +37,13 @@ class Dungeon():
         self.floor_map = floor_map
         self.doors = set()
         self.keys = set()
-
         self.nodes = set()
-        # edges = set()  # TODO *1 - is this needed?
+
+        self.node_names_to_node = {}
 
         x,y = self.entrance
         entrance_node = Node(x, y, "@")
-        self.nodes.add(entrance_node)
+        self.add_node(entrance_node)
 
         self.explore_from_node(entrance_node)
 
@@ -84,7 +85,7 @@ class Dungeon():
             # Either a door or key (where we've just made the node), or it's a real node - create it.
             if node is None:
                 node = Node(x, y)
-            self.nodes.add(node)
+            self.add_node(node)
             self.add_edge(prev_node, node, distance)
             self.explore_from_node(node)
         elif len(available_directions) == 0:
@@ -106,7 +107,6 @@ class Dungeon():
 
     def add_edge(self, node_a, node_b, distance):
         edge = Edge(node_a, node_b, distance)
-        # self.edges.add(edge)  # TODO *1 do we need self.edges ? (if so need to update remove_node() also)
 
     def remove_node(self, node_to_remove, node_is_door=False):
         # Remove this node from the graph.  If it's a door, then we may need to replace it with another regular node.
@@ -126,7 +126,7 @@ class Dungeon():
                 node.add_edge(new_edge)
                 node.remove_edge(edge)
 
-            self.nodes.remove(node_to_remove)
+            self.del_node(node_to_remove)
         else:
             # This node is a dead end.  We need to replace rather than remove it (we
             # don't want to leave a key, and we dont' want to cut out a node that 
@@ -143,30 +143,31 @@ class Dungeon():
             other_node.add_edge(new_edge)
             other_node.remove_edge(old_edge)
 
-        self.nodes.add(new_node)
-        self.nodes.remove(node_to_replace)
+        self.add_node(new_node)
+        self.del_node(node_to_replace)
 
     def find_node(self, name):
         # return the node with this name. Returns None if the door can't be found.
-        nodes = [node for node in self.nodes if node.name==name]
+        # nodes = [node for node in self.nodes if node.name==name]
 
-        if len(nodes) == 0:
-            return None
+        # if len(nodes) == 0:
+        #     return None
 
-        assert(len(nodes)==1)
-        return nodes[0]
+        # assert(len(nodes)==1)
+        # return nodes[0]
+        return self.node_names_to_node.get(name, None)
 
     def visible_doors(self, from_node):
         # Return a list of door-nodes visible from this node.
         # 'Visible' means not hidden behind a door - i.e. treat each door as a dead-end.
         return [node for node in self.visible_nodes(from_node) if isinstance(node, Door)]
 
-    def visible_keys(self, from_node):
+    def visible_keys(self, from_node, stop_on_keys=False):
         # Return a list of key-nodes visible from this node.
         # 'Visible' means not hidden behind a door.
-        return [node for node in self.visible_nodes(from_node) if isinstance(node, Key)]
+        return [node for node in self.visible_nodes(from_node, stop_on_keys=stop_on_keys) if isinstance(node, Key)]
     
-    def visible_nodes(self, from_node, used_edges=None, visited_nodes=None):
+    def visible_nodes(self, from_node, used_edges=None, visited_nodes=None, stop_on_keys=False):
         # Return a list of all nodes visible from this node.
         # 'Visible' means not hidden behind a door.
         # Current node is *not* returned.
@@ -194,8 +195,10 @@ class Dungeon():
 
             if isinstance(next_node, Door):
                 continue
+            elif stop_on_keys and isinstance(next_node, Key):
+                continue
             else:
-                visible_nodes.update(self.visible_nodes(next_node, used_edges=used_edges, visited_nodes=visited_nodes))
+                visible_nodes.update(self.visible_nodes(next_node, used_edges=used_edges, visited_nodes=visited_nodes, stop_on_keys=stop_on_keys))
 
         return visible_nodes
 
@@ -277,6 +280,8 @@ class Edge():
         node_a.add_edge(self)
         node_b.add_edge(self)
 
+        self.other_nodes = {node_a: node_b, node_b: node_a}
+
     def other_node(self, node):
         # Return the node at the other end of this edge
         assert(node in self.nodes)
@@ -289,15 +294,16 @@ def solve_dungeon(mapp):
     distance_travelled = 0
     choices = 1
 
+    # Would be good to modify this to not affect the underlying graph - then it would be faster to do repeats
     try:
         while remaining_keys:
-            visible_doors = dungeon.visible_doors(pacman_is_at)
-            visible_keys = dungeon.visible_keys(pacman_is_at)  # Not necessarily correct - perhaps we shouldn't show keys that are hidden behind outher keys (since we must pick up the first key on the way to the second)
+            # visible_doors = dungeon.visible_doors(pacman_is_at)
+            visible_keys = dungeon.visible_keys(pacman_is_at, stop_on_keys=True)  # Not necessarily correct - perhaps we shouldn't show keys that are hidden behind outher keys (since we must pick up the first key on the way to the second)
             if DEBUG: print([x.name for x in visible_doors+visible_keys])
             choices *= len(visible_keys)
 
             # Pick up a key, then 'open' the relevant door - i.e. remove that door node.
-            next_key = visible_keys.pop()
+            next_key = random.choice(visible_keys)
             distance_travelled += dungeon.minimum_distance(pacman_is_at, next_key)
             pacman_is_at = next_key
             newly_opened_door = dungeon.find_node(next_key.door_name())
@@ -313,15 +319,27 @@ def solve_dungeon(mapp):
         import pdb; pdb.set_trace()
         raise
 
-    print("Had {} choices; picked a route of length {}".format(choices, distance_travelled))
+    if not quiet: print("Had {} choices; picked a route of length {}".format(choices, distance_travelled))
     return distance_travelled
 
+
+def solve_dungeon(mapp, quiet=True, repeats=1):
+    lowest_distance = None
+    for repeat in range(repeats):
+        # test_dungeon = copy.deepcopy(dungeon)  # Slower than create_dungeon()
+        dungeon = create_dungeon(mapp)
+        distance = solve_the_dungeon(dungeon, quiet=quiet)
+
+        if lowest_distance is None or distance < lowest_distance:
+            lowest_distance = distance
+
+    return lowest_distance
 
 # Best is 8
 example_1 = """#########
 #b.A.@.a#
 #########"""
-print(solve_dungeon(example_1), "vs", 8)
+print(solve_dungeon(example_1, repeats=10), "vs", 8)
 
 # Best is 86
 example_2="""########################
@@ -329,7 +347,7 @@ example_2="""########################
 ######################.#
 #d.....................#
 ########################"""
-print(solve_dungeon(example_2), "vs", 86)
+print(solve_dungeon(example_2, repeats=10), "vs", 86)
 
 # Best is 132
 example_3 = """########################
@@ -337,7 +355,7 @@ example_3 = """########################
 #.######################
 #.....@.a.B.c.d.A.e.F.g#
 ########################"""
-print(solve_dungeon(example_3), "vs", 132)
+print(solve_dungeon(example_3, repeats=10), "vs", 132)
 
 # Best is 136
 example_4 = """#################
@@ -349,7 +367,7 @@ example_4 = """#################
 ########.########
 #l.F..d...h..C.m#
 #################"""
-print(solve_dungeon(example_4), "vs", 136)
+print(solve_dungeon(example_4, repeats=10), "vs", 136)
 
 # Best is 81
 example_5 = """########################
@@ -358,7 +376,7 @@ example_5 = """########################
 ###A#B#C################
 ###g#h#i################
 ########################"""
-print(solve_dungeon(example_5), "vs", 81)
+print(solve_dungeon(example_5, repeats=10), "vs", 81)
 
 # Part 1 puzzle
 puzzle = """#################################################################################
@@ -442,4 +460,15 @@ puzzle = """####################################################################
 #.#.#.#.#.#########.#########.#.#.#.###.###.###########.###########.#####.###.#.#
 #.....#.#...................#.O...#.....#...............#...........N.....#.....#
 #################################################################################"""
-print(solve_dungeon(puzzle))
+print(solve_dungeon(puzzle, repeats=10))
+
+import time, sys
+import cProfile
+N=10
+# cProfile.run('run_for_N(N)')
+cProfile.run('solve_dungeon(puzzle, quiet=True, repeats=N)')
+
+# Interestingly: copy.deepcopy(dungeon) is slower than dungeon=Dungeon(parse)
+# cProfile:
+# 4.543    0.045 copy.py:128(deepcopy)
+# 3.294    0.033 day18.py:301(create_dungeon)
