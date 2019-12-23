@@ -5,6 +5,7 @@ class Dungeon():
     def __init__(self, map_str):
         self.map_str = map_str
         self.parse_map(map_str)
+        self.create_tree()  # All the examples & puzzle are trees, not looping graphs.
 
     def parse_map(self, map_str):
         # Read in the text.
@@ -46,6 +47,62 @@ class Dungeon():
         self.add_node(entrance_node)
 
         self.explore_from_node(entrance_node)
+
+    def create_tree(self):
+        # Having parsed the map ad built a graph, now instead create a tree version of the graph.
+        # If the graph is not a tree, assert.
+        # We have: self.nodes (all the nodes, including connecting edges); self.entrance (x,y coords of the root)
+        # as well as self.find_node('@') (the root node).
+        # We want to build a set of TreeNodes starting at the root. Each TreeNode has a parent (None for the root),
+        # a list of children, and a cost (distance to parent). Also a name.
+        # For each node in our graph, create a mirror tree node for it and add it to the tree.
+        # Check that no node is added twice - if it is, this isn't a tree after all.
+        nodes_visited = set()
+        edges_used = set()
+        root = self.find_node('@')
+        nodes_visited.add(root)
+        self.tree = TreeNode(None, 0, root.x, root.y, name=root.name)
+        self.create_child_nodes(root, self.tree, nodes_visited, edges_used)
+
+    def create_child_nodes(self, node, tree_node, nodes_visited, edges_used):
+        # Add the children of this node, recursively
+        # 'node' is the regular-graph node that we're copying from.
+        # 'tree_node' is the node in the tree we're adding to.
+        # 'nodes_visited' is a list of regular nodes that have already been added.
+        # If we're trying to add the same node twice then there's a loop and this is not a tree. Assert.
+        # 'edges_used' is a list of edges we've already traversed - need because otherwise an added node
+        # will try to add its parent unless we skip edges already used.
+        for edge in node.edges:
+            if edge in edges_used:
+                # We've already gone this way - skip
+                continue
+            else:
+                edges_used.add(edge)
+
+            child_node = edge.other_node(node)
+            if child_node in nodes_visited:
+                print("Graph has a loop?", child_node.name)
+                import pdb; pdb.set_trace()
+                assert(False)
+            else:
+                nodes_visited.add(child_node)
+
+            if isinstance(child_node, Door):
+                child_tree_node = TreeDoor(tree_node, edge.weight, child_node.x, child_node.y, child_node.name)
+            elif isinstance(child_node, Key):
+                child_tree_node = TreeKey(tree_node, edge.weight, child_node.x, child_node.y, child_node.name)
+            else:
+                child_tree_node = TreeNode(tree_node, edge.weight, child_node.x, child_node.y)
+
+            self.create_child_nodes(child_node, child_tree_node, nodes_visited, edges_used)
+
+    def add_node(self, node):
+        self.nodes.add(node)
+        self.node_names_to_node[node.name] = node
+
+    def del_node(self, node):
+        self.nodes.remove(node)
+        del self.node_names_to_node[node.name]
 
     def explore_from_node(self, node):
         x, y = node.x, node.y
@@ -284,11 +341,50 @@ class Edge():
 
     def other_node(self, node):
         # Return the node at the other end of this edge
-        assert(node in self.nodes)
-        return [n for n in self.nodes if n != node].pop()
+        # assert(node in self.nodes)
+        # return [n for n in self.nodes if n != node].pop()
 
-def solve_dungeon(mapp):
-    dungeon = Dungeon(mapp)
+        # speedup following profiling
+        return self.other_nodes[node]
+
+
+class TreeNode():
+    # A node in a tree.
+    def __init__(self, parent, cost, x, y, name=None, children=None):
+        self.parent = parent  # None if this is the root
+        self.cost = cost  # Distance to parent
+        self.x = x
+        self.y = y
+
+        self.name = name if name else "T{}.{}".format(x,y)
+        self.children = children if children else []
+
+
+class TreeDoor(TreeNode):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert(len(self.name)==1)
+        assert('A'<=self.name<='Z')
+
+    def key_name(self):
+        return chr(ord(self.name)^ord(' '))  # ASCII : bit-6 (0x20 = ' ') toggles upper/lower case
+
+
+class TreeKey(TreeNode):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert(len(self.name)==1)
+        assert('a'<=self.name<='z')
+
+    def door_name(self):
+        return chr(ord(self.name)^ord(' '))  # ASCII : bit-6 (0x20 = ' ') toggles upper/lower case
+
+
+# Main functions #
+def create_dungeon(mapp):
+    return Dungeon(mapp)
+
+def solve_the_dungeon(dungeon, quiet=False):
     pacman_is_at = dungeon.find_node('@')
     remaining_keys = set(dungeon.keys)
     distance_travelled = 0
