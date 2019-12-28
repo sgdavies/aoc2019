@@ -1,7 +1,7 @@
 import logging, pdb, copy, sys
 from day20_data import *
 
-sys.setrecursionlimit(3000)
+sys.setrecursionlimit(4000)
 print(sys.getrecursionlimit())
 # exit()
 
@@ -224,7 +224,7 @@ class Donut():
     def solve(self, start='0oAA', end='0oZZ'):
         start_node = self.network.node_from_name(start)
         end_node = self.network.node_from_name(end)
-        assert(self.network.nodes_are_connected(start_node, end_node))
+        # assert(self.network.nodes_are_connected(start_node, end_node))
 
         return self.network.minimum_distance(start_node, end_node)
 
@@ -271,6 +271,7 @@ class Network():
 
             if current_node == dest:
                 log.debug(distances[dest][1])
+                print(distances[dest][1])
                 return distances[dest][0]
 
             visited.add(current_node)
@@ -370,7 +371,7 @@ if __name__ == "__main__":
 
         assert(test_map(PART_TWO_EXAMPLE) == 396)
 
-        test_map(PUZZLE_INPUT)
+        test_map(PUZZLE_INPUT)  # 7498 - takes about 20s
 
         log.critical("All tests passed")
 
