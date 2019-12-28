@@ -18,7 +18,7 @@ class Donut():
         # These are written top down or LtR, and either aobve/below or left/right of a path ('.')
         # Find the portals, and relabel their locations (so [ ,A,B,.,.] becomes [ , ,AB,.,.])
         # We're going to end up with single node representing both ends of the portal, but we also
-        # know that there's a cost of 1 for going through a portal. Hack that by putting the 1st
+        # know that there's a cost of 1 for going through a portal. Hack that by putting the outside
         # end of the portal over the adjacent path:
         # (1) A........A' -> (2)  A.......A (single node 'A' drawn in 2 locations but is a single logical node)
         #     0123456789         0123456789
@@ -32,6 +32,8 @@ class Donut():
                     continue
 
                 if c.isalpha():  # Part of a node name
+                    outside = (x==0 or x==len(row)-2 or y==0 or y==len(rows)-2)  # -2 because the label is 2 chars wide
+
                     if row[x+1].isalpha():
                         # "AB..." or "...CD" - we are at 'A' or 'C' (as we're scanning LtR)
                         #  01234      01234
@@ -71,17 +73,23 @@ class Donut():
 
                     # Now do the relabelling
                     rows[blank_y][blank_x] = ' '
-                    if name not in node_locations:
-                        # Node doesn't exist yet - put this one on the end of the adjacent path
-                        node_locations[name] = [(path_x, path_y)]
+
+                    if outside:
+                        # Put the node on the last path tile
+                        node_x, node_y = path_x, path_y
                         rows[label_y][label_x] = ' '
-                        rows[path_y][path_x] = name
-                        floor_map[(path_x, path_y)] = name
+                    else:
+                        node_x, node_y = label_x, label_y
+
+                    rows[node_y][node_x] = name
+                    floor_map[(node_x, node_y)] = name
+
+                    if name not in node_locations:
+                        # Node doesn't exist yet
+                        node_locations[name] = [(node_x, node_y)]
                     else:
                         # Node already exists
-                        node_locations[name].append((label_x, label_y))
-                        rows[label_y][label_x] = name
-                        floor_map[(label_x, label_y)] = name
+                        node_locations[name].append((node_x, node_y))
 
                 elif c=='.':
                     # piece of path. Not a shuffled node piece - because we're iterating top to bottom, left to right so that won't be '.' any more.
