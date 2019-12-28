@@ -18,12 +18,12 @@ class Donut():
         # These are written top down or LtR, and either aobve/below or left/right of a path ('.')
         # Find the portals, and relabel their locations (so [ ,A,B,.,.] becomes [ , ,AB,.,.])
         # We're going to end up with single node representing both ends of the portal, but we also
-        # know that there's a cost of 1 for going through a portal. Hack that by putting the 2nd
+        # know that there's a cost of 1 for going through a portal. Hack that by putting the 1st
         # end of the portal over the adjacent path:
-        # (1) A........A' -> (2) A.......A (single node 'A' drawn in 2 locations but is a single logical node)
-        #     0123456789         012345678
+        # (1) A........A' -> (2)  A.......A (single node 'A' drawn in 2 locations but is a single logical node)
+        #     0123456789         0123456789
         # (1) Cost to go from 2->7 is 3 (2>1, 1>8, 8>7)
-        # (2) Cost to go from 2->7 is still 3 (2>1, 1>A, A>7)
+        # (2) Cost to go from 2->7 is still 3 (2>A, A>8, 8>7)
         node_locations = {}
         floor_map = {}
         for y, row in enumerate(rows):
@@ -72,15 +72,16 @@ class Donut():
                     # Now do the relabelling
                     rows[blank_y][blank_x] = ' '
                     if name not in node_locations:
-                        node_locations[name] = [(label_x, label_y)]
-                        rows[label_y][label_x] = name
-                        floor_map[(label_x, label_y)] = name
-                    else:
-                        # Node already exists - put this one on the end of the adjacent path
+                        # Node doesn't exist yet - put this one on the end of the adjacent path
+                        node_locations[name] = [(path_x, path_y)]
                         rows[label_y][label_x] = ' '
                         rows[path_y][path_x] = name
-                        node_locations[name].append((path_x, path_y))
                         floor_map[(path_x, path_y)] = name
+                    else:
+                        # Node already exists
+                        node_locations[name].append((label_x, label_y))
+                        rows[label_y][label_x] = name
+                        floor_map[(label_x, label_y)] = name
 
                 elif c=='.':
                     # piece of path. Not a shuffled node piece - because we're iterating top to bottom, left to right so that won't be '.' any more.
@@ -127,7 +128,6 @@ class Donut():
             return
 
         del self.floor_map[(x,y)]
-        if (x,y)==(1,8): pdb.set_trace()
 
         available_directions = self.neighbouring_paths(x,y)
         for new_x, new_y in available_directions:
@@ -317,13 +317,11 @@ if __name__ == "__main__":
         return distance
 
     def tests():
-        log.setLevel(logging.INFO)
-        test_map(EXAMPLE_ONE)
+        assert(test_map(EXAMPLE_ONE) == 23)
 
-        log.setLevel(logging.WARNING)
-        test_map(EXAMPLE_TWO)
+        assert(test_map(EXAMPLE_TWO) == 58)
 
-        test_map(PUZZLE_INPUT)
+        assert(test_map(PUZZLE_INPUT) == 616)
 
         log.critical("All tests passed")
 
