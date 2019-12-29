@@ -1,4 +1,4 @@
-import logging, pdb
+import logging, pdb, timeit
 
 logging.basicConfig()
 log = logging.getLogger()
@@ -6,16 +6,38 @@ log = logging.getLogger()
 class Deck():
     def __init__(self, size):
         self.size = size
-        self.deck = range(size)
+        self.deck = list(range(size))
 
     def shuffle(self, instructions):
-        # TODO implement
-        # assert(False)
-        pass
+        for instruction in instructions.split('\n'):
+            self.do_instruction(instruction)
 
+    def do_instruction(self, instruction):
+        if instruction == "deal into new stack":
+            self.deck = self.deck[::-1]
+        elif instruction.startswith("cut "):
+            self._cut(int(instruction[4:]))
+        elif instruction.startswith("deal with increment "):
+            self._deal_with_increment(int(instruction[len("deal with increment "):]))
+        else:
+            log.critical("Didn't understand instruction: '{}'".format(instruction))
+            assert(False)
+
+    def _cut(self, N):
+        self.deck = self.deck[N:] + self.deck[:N]
+
+    def _deal_with_increment(self, N):
+        out = ['x']*self.size
+        ix = 0
+        while self.deck:
+            out[ix] = self.deck.pop(0)
+            ix += N
+            ix %= self.size
+
+        self.deck = out
+        
     def order(self):
-        # return self.deck
-        return [0,3,6,9,2,5,8,1,4,7]
+        return self.deck
 
 def test(deck_size, instructions, answer):
     deck = Deck(10)
@@ -25,7 +47,12 @@ def test(deck_size, instructions, answer):
     assert(" ".join([str(i) for i in deck.order()]) == answer)
 
 def tests():
-    log.setLevel(logging.DEBUG)
+    # log.setLevel(logging.DEBUG)
+    test(10, "deal into new stack", "9 8 7 6 5 4 3 2 1 0")
+    test(10, "cut 3", "3 4 5 6 7 8 9 0 1 2")
+    test(10, "cut -4", "6 7 8 9 0 1 2 3 4 5")
+    test(10, "deal with increment 3", "0 7 4 1 8 5 2 9 6 3")
+
     example_one = """deal with increment 7
 deal into new stack
 deal into new stack"""
@@ -34,14 +61,15 @@ deal into new stack"""
 
     example_two = """cut 6
 deal with increment 7
-deal into new stack
-Result: 3 0 7 4 1 8 5 2 9 6
-deal with increment 7
+deal into new stack"""
+    test(10, example_two, "3 0 7 4 1 8 5 2 9 6")
+
+    example_three = """deal with increment 7
 deal with increment 9
 cut -2"""
-    test(10, example_two, "6 3 0 7 4 1 8 5 2 9")
+    test(10, example_three, "6 3 0 7 4 1 8 5 2 9")
 
-    example_three = """deal into new stack
+    example_four = """deal into new stack
 cut -2
 deal with increment 7
 cut 8
@@ -51,13 +79,11 @@ cut 3
 deal with increment 9
 deal with increment 3
 cut -1"""
-    test(10, example_three, "9 2 5 8 1 4 7 0 3 6")
+    test(10, example_four, "9 2 5 8 1 4 7 0 3 6")
 
     log.critical("All tests passed")
 
-if __name__ == "__main__":
-    tests()
-
+def do_part_one(deck_size):
     puzzle_input = """deal with increment 31
 deal into new stack
 cut -7558
@@ -159,10 +185,16 @@ deal into new stack
 cut 897
 deal with increment 36"""
     
-    deck = Deck(10007)
+    deck = Deck(deck_size)
     deck.shuffle(puzzle_input)
     out = deck.order()
-    log.warning(out)
+    log.debug(out)
 
     ix2019 = out.index(2019)
-    print(ix2019)
+    assert(ix2019 == 7860)
+
+if __name__ == "__main__":
+    tests()
+
+    print(10, 10007, timeit.timeit("do_part_one(10007)", setup="from __main__ import do_part_one", number=10))
+    print(1, 119315717514047, timeit.timeit("do_part_one(119315717514047)", setup="from __main__ import do_part_one", number=1))
