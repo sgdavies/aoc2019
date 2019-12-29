@@ -56,92 +56,33 @@ assert(out_arr[-1] == 19360288)
 
 # Part 2 - use "RUN" instruction, and can now see up to 9 tiles away with A,B,C,D,E,F,G,H,I
 # If you only check for D you might jump too soon
-# check for (D and H) and you fail on xxx##...#
-#                                     ABCDEFGHI
-# So check for D and (H or I) - assumes E, but if not then you're screwed anyway.
-# ...
-# AND D J <-- J if any of notA,notB,notC, and D
-# NOT I T <-- T is notI
-# NOT T T <-- T is I
-# OR H T  <-- T is (H or I)
-# AND T J
-# but always jump if not A, as a last resort
-# NOT A T  <-- T is true if A is a hole
-# OR T J  <-- even if J was false, now set it to true
-# ^ fails on #####.#.##.######
-#               ABCDEFGHI
-# D is, H isn't but I is - but E isn't, so we die.
-# Needed to not jump yet.
-# Jump if (D and H) or (D and E and I) or (D and E and F and 'j') or (not A)
-#
-# ((nA) or (nB and nE) or (nC and nF)) and D
-# How to do (nB & nE) | (nC & nF) ? once this is in J, then:
-# not a t
-# or t j
-# and d j
-#
-# not b t
-# not e j
-# and t j
-#
-# nC & nF = n(C|F)
-# not c t
-# not t t -> t=c
-# or f t  -> t = c|f 
-# not t t -> t = n(c|f) = (nc & nf)
-# 
-# Failed on:
-# 1a   ABCDEFGHI
-# 1b    ABCDEFGHI
-#   #####.###@##..###
-# 2.        ABCDEFGHI
-# Didn't jump at A - because not-D
-#
-# 1ABCDEFGHI
-# ##.###.##..###
-#     2ABCDEFGHI
-#         3ABCDEFGHI
-# At 1, 2 and 3 you must jump.
-# 3 is just nA. [with answer in J, this is nat,otj]
-# 2 is (nB & nE) [without j: nbt,ntt,oet,ntt - followed by otj to join]
-# so 1b is ... (nB & nF & nI) [t,j blank: nbt, nfj, atj, nit, atj]
-# Result: nbt,nfj,atj,nit,atj,nbt,ntt,oet,ntt,otj,nat,otj
-# Failed on (took off at A, landed in D):
-#    ABCDEFGHI
-# ####.#..######
-#  1ABCDEFGHI
-#      2ABCDEFGHI
-# 1 need to jump - because nC & nF
-# 2 need to jump - nA
-#
-# Combine:
-# (nA | (nB & nE) | (nB & nF & nI)) or (nA | (nC & nF))
-# = nA | (nB & nE) | (nB & nF & nI) | (nC & nF) <-- too long
-# replace (nb&nf&ni) with (nC & nG) all &D
-# (nA | (nB & nE) | (nC & nG) | (nC & nF)) &D
-# (nC & nG) | (nC & nF) = n(n(nC&nG) & n(nC&nF)) = n( (C|G) & (C|F) ) = n( C | (F&G)) = ( nC & n(F&G)) = nC & (nF|nG)
-# Leaving whole as
-# nA | (nB & nE) | (nC & (nF|nG)) ..&D
-#
-# Fails:
-# 1a ABCDEFGHI
-# 1b  ABCDEFGHI
-# #####.####.#..###
-# 2       ABCDEFGHI
-# Need to jump at 1a or 1b
-input_str="""NOT F T
-NOT G J
-OR T J
-NOT C T
+# New plan
+# #############
+#  ABCDEFGHIjkl
+# Jump if nA
+# or if D and (nB&nE or nC&nE&nF)
+# nA | (D & (nB&nE) | (nC&nE&nF))   ~~~ nB&nE = n(B|E)
+# nct, nej, atj, nft, atj
+# nbt, ntt, oet, ntt, otj
+# adj
+# nat
+# otj       ABCDEFGHI
+# Failed on #.###.##..##
+# jump if nB & (nF&nI)
+# nA | (D & (nB & (nE | (nF&nI)) | (nC&nE&nF))   ~~~ nF&nI = n(F|I)
+input_str="""NOT C T
+NOT E J
+AND T J
+NOT F T
 AND T J
 NOT B T
 NOT T T
 OR E T
 NOT T T
 OR T J
+AND D J
 NOT A T
 OR T J
-AND D J
 RUN
 """
 
