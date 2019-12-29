@@ -246,11 +246,11 @@ class TemplateInstr(Instruction):
 
 class Computer:
     def __init__ (self, initial_memory_state, inputs=[], input_fun=None, pause_on_output=False):
-        if inputs and input_fun:
-            print("Invalid - define either inputs array or inputs function, not both")
-            print(inputs)
-            print(input_fun)
-            assert(False)
+        # if inputs and input_fun:
+        #     print("Invalid - define either inputs array or inputs function, not both")
+        #     print(inputs)
+        #     print(input_fun)
+        #     assert(False)
         self.memory = list(initial_memory_state)
         self.ip = 0
         self.inputs = inputs
@@ -281,10 +281,12 @@ class Computer:
             self.memory.append(0)
 
     def get_input(self):
-        if self.input_fun:
+        if self.inputs:
+            return self.inputs.pop(0)
+        elif self.input_fun:
             return self.input_fun()
         else:
-            return self.inputs.pop(0)
+            assert(False), "No inputs available"
 
     def run(self):
         # If computer is in "pause_on_output" mode, run until there is an instruction or program
