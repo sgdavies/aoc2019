@@ -1,4 +1,4 @@
-import logging, pdb, sys
+import logging, pdb, sys, itertools
 from computer import Computer
 
 logging.basicConfig()
@@ -99,16 +99,24 @@ west
 south
 """
 
+gegt_all_the_keys = True
+ejected = "you are ejected back to the checkpoint"
+all_items = ["coin","shell","tambourine","easter egg","klein bottle","astrolabe","hypercube","dark matter"]
+try_combos = True
+found_combo = False
 
 if __name__ == "__main__":
     #tests()
 
     droid = Computer(program, pause_on_output=True)
 
-    instruction_list = GET_EASTER + GET_KLEIN + GET_ASTROLABE + GET_TAMBOURINE + GET_SHELL + GET_HYPERCUBE + GET_DARK_MATTER + GET_COIN + GOTO_CHECKPOINT
-    instructions = [instruction + '\n' for instruction in instruction_list.split('\n')]
-    instructions.pop()
-    log.debug(",".join(instructions))
+    if gegt_all_the_keys:
+        instruction_list = GET_EASTER + GET_KLEIN + GET_ASTROLABE + GET_TAMBOURINE + GET_SHELL + GET_HYPERCUBE + GET_DARK_MATTER + GET_COIN + GOTO_CHECKPOINT
+        instructions = [instruction + '\n' for instruction in instruction_list.split('\n')]
+        instructions.pop()
+        log.debug(",".join(instructions))
+    else:
+        instructions = []
 
     while True:
         out = ""
@@ -121,15 +129,36 @@ if __name__ == "__main__":
             if halted:  # Game has ended
                 print(out)
                 print("Game over")
+                exit()
 
 
-        if instructions:
+        if instructions and not found_combo:
             print(out)
-            input_str = instructions.pop(0)
+            if "== Pressure-Sensitive Floor ==" in out and "you are ejected back to the checkpoint" not in out:
+                found_combo = True
+                input_str = "inv\n"
+            else:
+                input_str = instructions.pop(0)
             print(input_str)
             sys.stdout.flush()
+        elif try_combos and not found_combo:
+            instructions = ["drop {}\n".format(item) for item in all_items]
+            # Try different combos of items
+            for n in range(1,8):
+                item_combos = itertools.combinations(all_items, n)
+                for items in item_combos:
+                    # pick up required items
+                    # try to go south
+                    # drop the items
+                    instructions += ["take {}\n".format(item) for item in items]
+                    instructions.append("south\n")
+                    instructions += ["drop {}\n".format(item) for item in items]
         else:
-            input_str = raw_input(out) + '\n'
+            if sys.version.startswith('3'):
+                input_str = input(out) + '\n'
+            else:
+                input_str = raw_input(out) + '\n'
         input_ascii=[ord(c) for c in input_str]
         droid.inputs = input_ascii
 
+# 2214608912
