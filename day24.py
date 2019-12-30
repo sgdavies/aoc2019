@@ -12,66 +12,41 @@ class Eris():
         self.height = len(rows)
         self.width = len(rows[0])
 
-        self.state=[]
-        for row in rows:
-            self.state.append([1 if c=='#' else 0 for c in row])
+        self.state=set()
+        for y, row in enumerate(rows):
+            for x, c in enumerate(row):
+                if c=='#':
+                    self.state.add((x,y))
         log.debug(initial_state)
         log.debug(self.state)
 
     def biodiversity_value(self):
-        total = 0
-        linear = []
-        for row in self.state: linear += row
-
-        for i, val in enumerate(linear):
-            if val:
-                total += 2**i
-
-        return total
+        return sum([2**(x + self.width*y) for x, y in self.state])
 
     def step(self, number):
         for i in range(number):
             self._step()
 
     def _step(self):
-        next = [[0]*self.width for x in range(self.height)]
-        #next = copy.deepcopy(self.state)
+        next = set()
 
-        n_str=""
         for y in range(self.height):
-            x_str=""
             for x in range(self.width):
                 neighbours = self._neighbours(x,y)
 
-                if self.state[y][x]:
+                if (x,y) in self.state:
                     if neighbours==1:
-                        val = 1
-                    else:
-                        val = 0
+                        next.add((x,y))
                 else:
                     if neighbours==1 or neighbours==2:
-                        val = 1
-                    else:
-                        val = 0
+                        next.add((x,y))
 
-                next[y][x] = val
-                x_str += "{}".format(val)
-            n_str += x_str + "\n"
-
-        log.debug("Neighbours:\n" + n_str)
         self.state = next
         log.debug("New state:\n" + self.state_str())
 
     def _neighbours(self, x, y):
         # Count how many neighbours this square has
-        ns = 0
-        xys = [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]
-        for tx, ty in xys:
-            if (0 <= tx < self.width) and (0 <= ty < self.height):
-                ns += self.state[ty][tx]
-
-        log.debug("{},{}: {}".format(x, y, ns))
-        return ns
+        return len([1 for a,b in [(x-1, y), (x+1, y), (x, y-1), (x, y+1)] if (a,b) in self.state])
 
     def run_until_dupe(self):
         self.prev_states = set()
@@ -86,7 +61,17 @@ class Eris():
                 self.prev_states.add(bio)
 
     def state_str (self):
-        return "\n".join(["".join(['#' if x else '.' for x in row]) for row in self.state])
+        out = []
+        for y in range(self.height):
+            x_str = ""
+            for x in range(self.width):
+                if (x,y) in self.state:
+                    x_str += '#'
+                else:
+                    x_str += '.'
+            out.append(x_str)
+
+        return "\n".join(out)
 
 
 def test(start, steps, end):
