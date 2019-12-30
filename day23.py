@@ -58,7 +58,7 @@ def get_fun(index):
                 # we just finished consuming the last packet - remove the queue
                 if len(packets) == 0:
                     del packet_queues[index]
-            
+
             ret = arr.pop(0)
         else:
             # No packets in queue
@@ -67,28 +67,20 @@ def get_fun(index):
         locks[index].release()
         return ret
 
-    def bad_fun():
-        # don't return anything (so the nic is frozen), and just kick off the next nic
-        log.warning("nic {} wants input - starting next".format(index))
-        next_ix = index+1
-        if next_ix == 50:
-            print("That's all folks!"); sys.stdout.flush()
-            exit()
-        my_run(nics[next_ix], next_ix)
+    #def bad_fun():
+    #    # don't return anything (so the nic is frozen), and just kick off the next nic
+    #    log.warning("nic {} wants input - starting next".format(index))
+    #    next_ix = index+1
+    #    if next_ix == 50:
+    #        print("That's all folks!"); sys.stdout.flush()
+    #        exit()
+    #    my_run(nics[next_ix], next_ix)
 
-    return bad_fun
+    return fun
 
 locks = [threading.Lock() for i in range(50)]
 packet_queues = {}  # Each entry (keyed by address) is an array of (x,y) tuples
 nics = [Computer(nic_code, inputs=[i], input_fun=get_fun(i), pause_on_output=True) for i in range(50)]
-
-while True:
-    out,halted = nics[0].run()
-    log.debug(out)
-
-    if halted: exit()
-
-assert(False), "Shouldn't get here!"
 
 for i, nic in enumerate(nics):
 
@@ -96,10 +88,10 @@ for i, nic in enumerate(nics):
         try:
             my_run(nic, i)
         except:
-            log.exception()
+            log.exception("Hit exception in thread {}".format(i))
             log.error("Hopefully you've just seen the exception for {}".format(i))
             raise
 
     threading.Thread(target=try_run, name="nic {} thread".format(i)).start()
 
-    if i>2: break
+    #if i>2: break
