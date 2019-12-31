@@ -56,33 +56,31 @@ assert(out_arr[-1] == 19360288)
 
 # Part 2 - use "RUN" instruction, and can now see up to 9 tiles away with A,B,C,D,E,F,G,H,I
 # If you only check for D you might jump too soon
-# New plan
-# #############
-#  ABCDEFGHIjkl
-# Jump if nA
-# or if D and (nB&nE or nC&nE&nF)
-# nA | (D & (nB&nE) | (nC&nE&nF))   ~~~ nB&nE = n(B|E)
-# nct, nej, atj, nft, atj
-# nbt, ntt, oet, ntt, otj
-# adj
-# nat
-# otj       ABCDEFGHI
-# Failed on #.###.##..##
-# jump if nB & (nF&nI)
-# nA | (D & (nB & (nE | (nF&nI)) | (nC&nE&nF))   ~~~ nF&nI = n(F|I)
-input_str="""NOT C T
-NOT E J
-AND T J
-NOT F T
-AND T J
-NOT B T
+# Examples
+# #####.###.##..### = ####AbCDEfGHi.###  nB & nF & nI (nB - must jump to E; nF - must jump to H; nI - can't jump twice from B,E,i
+# #####..###.#..### = ####AbcDEFgHi.###  nB & nG & nI
+#  #####.##.##.#.### = ###ABcDEfGHi#.### } nC & (nF|nG)
+#  #####.###.#.#.### = ###ABcDEFgHi#.### }
+# Combining the above: (nB|nC)&(nF|nG)
+#
+# #####..#.######## = ####AbcDeFGHI####  nB & nE (if we wait 1 step, then we can't jump at A' because nD')
+#
+# Must be 15 instructions of less
+input_str="""NOT F T
 NOT T T
-OR E T
-NOT T T
-OR T J
-AND D J
+AND G T
+OR I T
+AND E T
+OR B T
+NOT C J
+NOT J J
+OR E J
+OR F J
+AND T J
+NOT J J
 NOT A T
 OR T J
+AND D J
 RUN
 """
 
@@ -97,3 +95,40 @@ if out_arr[-1] > 128:
 else:
     # Crashed
     print("".join(chr(c) for c in out_arr))
+
+# 1 a.D
+# 2 cef|
+# 3 b.(e | i(f|g) )
+#
+# (f|g) = n(FG)
+# i(f|g) = i.n(FG) = n( I|(FG) )
+# e | i(f|g) = e | n( I|(FG) ) = n( E.(I|(FG)) )
+# b.(e | i(f|g) ) = b.n( E.(I|(FG)) )
+# 3 = n( B|(E(I|(FG))) )
+#
+# 2 = n(C|E|F)
+#
+# 2|3 =n(C|E|F)|n[B|(E(I|(FG))] =n[ (C|E|F). B|(E(I|(FG)) ]
+#
+# C|E|F: 4 steps, to T or J
+# nct
+# ntt
+# oet
+# oft
+#
+# B|(E(I|(FG)): 6 steps, to T or J
+# nft
+# ntt
+# agt
+# oit
+# aet
+# obt
+#
+# combine
+# atj
+# negate
+# njj
+#
+# nat
+# atj
+# adj
