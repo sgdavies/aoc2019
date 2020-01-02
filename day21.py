@@ -63,23 +63,34 @@ assert(out_arr[-1] == 19360288)
 #  #####.###.#.#.### = ###ABcDEFgHi#.### }
 # Combining the above: (nB|nC)&(nF|nG)
 #
+# #####.#.##...#### =
+#
 # #####..#.######## = ####AbcDeFGHI####  nB & nE (if we wait 1 step, then we can't jump at A' because nD')
 #
 # Must be 15 instructions of less
+#
+# Final answer - you should jump now if:
+# 1. You need to jump rather than walk to D (any of A, B or C is missing)
+# 2. There's somewhere safe to land:
+#   - D is there
+#   - You can escape from D: either H is there (another jump), or both E and I
+#   are there (walk to E then jump), or E and F are there (and you hope J -
+#   but we can't see that far).
+# That is: (a|b|c).D.(H|EF|EI)
+# (a|b|c) = nABC => naj, njj, abj, acj, njj
+# H|EF|EI = H|E(F|I) => nft ntt oit aet oht
+# Combine and add D: atj adj
 input_str="""NOT F T
 NOT T T
-AND G T
 OR I T
 AND E T
-OR B T
-NOT C J
+OR H T
+NOT A J
 NOT J J
-OR E J
-OR F J
+AND B J
+AND C J
+NOT J J
 AND T J
-NOT J J
-NOT A T
-OR T J
 AND D J
 RUN
 """
@@ -92,43 +103,7 @@ out_arr = springdroid.run()
 if out_arr[-1] > 128:
     # Successful
     print("Damage: {}".format(out_arr[-1]))
+    assert(out_arr[-1] == 1143814750)
 else:
     # Crashed
     print("".join(chr(c) for c in out_arr))
-
-# 1 a.D
-# 2 cef|
-# 3 b.(e | i(f|g) )
-#
-# (f|g) = n(FG)
-# i(f|g) = i.n(FG) = n( I|(FG) )
-# e | i(f|g) = e | n( I|(FG) ) = n( E.(I|(FG)) )
-# b.(e | i(f|g) ) = b.n( E.(I|(FG)) )
-# 3 = n( B|(E(I|(FG))) )
-#
-# 2 = n(C|E|F)
-#
-# 2|3 =n(C|E|F)|n[B|(E(I|(FG))] =n[ (C|E|F). B|(E(I|(FG)) ]
-#
-# C|E|F: 4 steps, to T or J
-# nct
-# ntt
-# oet
-# oft
-#
-# B|(E(I|(FG)): 6 steps, to T or J
-# nft
-# ntt
-# agt
-# oit
-# aet
-# obt
-#
-# combine
-# atj
-# negate
-# njj
-#
-# nat
-# atj
-# adj
