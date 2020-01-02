@@ -7,6 +7,10 @@ class Deck():
     def __init__(self, size):
         self.size = size
         self.deck = list(range(size))
+        self.x_for_i = {}
+        self.funs = []
+        def identity(x): return x
+        self.funs.append(identity)
 
     def shuffle(self, instructions):
         for instruction in instructions.split('\n'):
@@ -15,13 +19,41 @@ class Deck():
     def do_instruction(self, instruction):
         if instruction == "deal into new stack":
             self.deck = self.deck[::-1]
+
+            last_f = self.funs[-1]
+            def f(x): return last_f(self.size-1-x)
+            self.funs.append(f)
+
         elif instruction.startswith("cut "):
-            self._cut(int(instruction[4:]))
+            cut_len = int(instruction[4:])
+            self._cut(cut_len)
+
+            last_f = self.funs[-1]
+            def f(x): return last_f(x+cut_len)
+            self.funs.append(f)
+
         elif instruction.startswith("deal with increment "):
-            self._deal_with_increment(int(instruction[len("deal with increment "):]))
+            increment = int(instruction[len("deal with increment "):])
+            self._deal_with_increment(increment)
+
+            last_f = self.funs[-1]
+            def f(x): return last_f(x*self.get_x_for_i(increment))
+            self.funs.append(f)
+
         else:
             log.critical("Didn't understand instruction: '{}'".format(instruction))
             assert(False)
+
+    def get_x_for_i(self, increment):
+        if increment not in self.x_for_i:
+            for x in xrange(self.size):
+                if (x*increment)%self.size == 1:
+                    self.x_for_i[x] = increment
+                    self.x_for_i[increment] = x
+                    log.debug("x-for-i: {},{}".format(increment, x))
+                    break
+
+        return self.x_for_i[increment]
 
     def _cut(self, N):
         self.deck = self.deck[N:] + self.deck[:N]
@@ -35,12 +67,26 @@ class Deck():
             ix %= self.size
 
         self.deck = out
-        
+
     def order(self):
         return [self.card_at(i) for i in range(self.size)]
 
     def card_at(self, index):
+        try:
+            assert(self.card_at_fun(index) == self.deck[index])
+        except AssertionError:
+            import pdb; pdb.set_trace()
+            raise
         return self.deck[index]
+
+    def card_at_fun(self, index):
+        answer = self.funs[-1](index)
+        #log.debug(answer)
+        answer = answer % self.size
+        #log.debug(answer)
+
+        #import pdb; pdb.set_trace()
+        return answer
 
 def test(deck_size, instructions, answer):
     deck = Deck(10)
@@ -50,7 +96,7 @@ def test(deck_size, instructions, answer):
     assert(" ".join([str(i) for i in deck.order()]) == answer)
 
 def tests():
-    # log.setLevel(logging.DEBUG)
+    log.setLevel(logging.DEBUG)
     test(10, "deal into new stack", "9 8 7 6 5 4 3 2 1 0")
     test(10, "cut 3", "3 4 5 6 7 8 9 0 1 2")
     test(10, "cut -4", "6 7 8 9 0 1 2 3 4 5")
@@ -192,7 +238,7 @@ deal with increment 36"""
 def do_part_one():
     deck = Deck(10007)
     deck.shuffle(puzzle_input)
-    
+
     assert(deck.card_at(7860) == 2019)
 
 if __name__ == "__main__":
@@ -253,18 +299,107 @@ assert(out[400] == (400+336)%587)
 # 1. Sum all cuts; +ve if forward (even number of stack deals have happened), -ve if reverse (after odd number of stack deals)
 # 2. Answer is (i +sum) % size if forwards, or (size -1 -i) % size if backwards.
 #
-# Now to handle deal with increment.
+# Now to handle deal with increment A.
+# See details below - net is:
+# Card at index i is Xi mod N, for some value of X [while facing forward]
+#
+# Examples (deck 7)
+# 0123456
+# 0415263 dwi 2 (X=4) 0>0, 1>4, 2>8=1, 3>12=5, 4>16=2, 5>20=6, 6>24=3
+# 0654321 dwi 3 (X=5) 0>0, 1>5, 2>10=3, 3>15=1, 4>20=6, 5>25=4, 6>30=2
+#
+# To solve:
+# 1- what's the effect of dwi A + dwi B?
+# 2- what's the effect of dwi X after cut?
+# 3- what's the effect of dwi X after reverse?
+# 4- what's the combined effect of all the above?
+#
+# 0123456
+# 0415263 dwi 2 (x=4)
+# 0246135 dwi 2 again
+#
+# 1. dwi A, dwi B?
+#    dwi A,B = i(X*Y)%N
+#
+# 2. cut A then dwi B?
+# 0123456
+# 2345601 cut 2 x=i+c =i+2
+# 2630415 dwi 2 (X=4)  x=(Xi+c)%N =(4i+2)%7
+# 4152630 cut 4 (or 6304152 cut 1, 3041526 cut 2, 0415263 cut 3 etc)
+#           X(i+c2)+c1 = X(i+4) +2
+# 4321065 dwi 3 (X=5)  x1(x2*i+c2)+c1
+
+# Deck of 13
+inn = """deal with increment 5
+deal with increment 2
+cut -4
+deal with increment 4
+cut 12
+deal with increment 7
+deal with increment 8
+cut -7
+cut -12
+deal with increment 2
+deal into new stack
+deal with increment 5
+deal with increment 4
+deal into new stack
+deal with increment 7
+deal into new stack
+cut 5
+deal with increment 8
+deal with increment 7"""
+#                       0:  0 1 2 3 4 5 6 7 8 9 10 11 12
+# deal with increment 5 1:  0 8 3 11 6 1 9 4 12 7 2 10 5  x1=8    a=x1.i = 8i
+# deal with increment 2 2:  0 4 8 12 3 7 11 2 6 10 1 5 9  x2=7    a=x1.x2.i = 56i
+# cut -4                3:  10 1 5 9 0 4 8 12 3 7 11 2 6  c3=-4   a=x1.x2.(i+c3) = 56(i-4)
+# deal with increment 4 4:  10 11 12 0 1 2 3 4 5 6 7 8 9  x4=10   a=x1.x2.(x4.i+c3)
+# cut 12                5:  9 10 11 12 0 1 2 3 4 5 6 7 8  c5=12
+# deal with increment 7 6:  9 11 0 2 4 6 8 10 12 1 3 5 7  x6=2
+# deal with increment 8 7:  9 6 3 0 10 7 4 1 11 8 5 2 12  x7=5
+# cut -7                8:  4 1 11 8 5 2 12 9 6 3 0 10 7  c8=-7
+# cut -12               9:  1 11 8 5 2 12 9 6 3 0 10 7 4  c9=-12
+# deal with increment 2 10: 1 6 11 3 8 0 5 10 2 7 12 4 9  x10=7  a=x1.x2.(x4.(x6.x7.(x10.i+c9+c8)+c5)+c3)
+# deal into new stack   11: 9 4 12 7 2 10 5 0 8 3 11 6 1  ****   a=f11(x)=f10(12-x)
+# deal with increment 5 12: 9 8 7 6 5 4 3 2 1 0 12 11 10  x12=8
+# deal with increment 4 13: 9 12 2 5 8 11 1 4 7 10 0 3 6  x13=10 a=f13(x)=f12(10*x)
+# deal into new stack   14: 6 3 0 10 7 4 1 11 8 5 2 12 9  ****  f14=f13(12-x)
+# deal with increment 7 15: 6 0 7 1 8 2 9 3 10 4 11 5 12  x15=2
+# deal into new stack   16: 12 5 11 4 10 3 9 2 8 1 7 0 6  ****
+# cut 5                 17: 3 9 2 8 1 7 0 6 12 5 11 4 10  c17=5
+# deal with increment 8 18: 3 7 11 2 6 10 1 5 9 0 4 8 12  x18=5
+# deal with increment 7 19: 3 11 6 1 9 4 12 7 2 10 5 0 8  x19=2
+deck = Deck(13)
+print(" ".join([str(x) for x in deck.order()]))
+for ins in inn.split('\n'):
+    deck.shuffle(ins)
+    print("{:25} {}".format(ins, " ".join([str(x) for x in deck.order()])))
+
+print("Done")
+
+
+# Need to map from inc->X
+# A,B pairs such that A*B = 1 mod N
+#
+#
+# (i=0 always stays in the same place; N=length of deck)
+# How to figure out X??
+#
+# Each X pairs with A - i.e. X = f(N,A) => A = f(N,X)
+#
 # 0123456789 (10)
 # (no 2, 4, 6, 8 or 5)
 # 0741852963 dwi 3 == 7*i mod 10 (10,3)->7
 # 0369258147 dwi 7 == 3*i mod 10 (10,7)->3
+# So 10->3,7
 #
 # 0123456 (7)
 # 0415263 dwi 2  7,2 -> 4
 # 0531642 dwi 3  7,3 -> 5
 # 0246135 dwi 4  7,4 -> 2
 # 0362514 dwi 5  7,5 -> 3
-# 
+# 7->2,4, 3,5
+#
 # 0 1 2 3 4 5 6 7 8 9 101112 (13)
 # 0 7 1 8 2 9 3 104 115 126  13,2 - 7
 # 0 9 5 1 106 2 117 3 128 4  13,3 - 9
@@ -277,6 +412,8 @@ assert(out[400] == (400+336)%587)
 # 0 4     3     2     1      13,10- 4
 # 0 6   5   4   3   2   1    13,11- 6
 # 0                       1  13,12- 12
+# 13 -> 2,7, 3,9, 4,10, 5-8, 6,11
+# AX = 1modN
 #
 # 012345678 (9)
 # 051627384 dwi 2  9,2 -> 5
@@ -294,3 +431,78 @@ assert(out[400] == (400+336)%587)
 # 04321 dwi 4  5,4 -> 4
 #
 # x*i %N = 1
+
+# Unique instructions in puzzle input:
+# deal into new stack
+# cut -1554
+# cut -2118
+# cut -3065
+# cut -3119
+# cut -405
+# cut -4271
+# cut -4745
+# cut -4891
+# cut -5824
+# cut -5959
+# cut -6927
+# cut -7558
+# cut -7717
+# cut -8156
+# cut -8799
+# cut -889
+# cut -9003
+# cut -9107
+# cut -9826
+# cut -9906
+# cut -9978
+# cut 13
+# cut 1529
+# cut 194
+# cut 2277
+# cut 2501
+# cut 2871
+# cut 3138
+# cut 3553
+# cut 4242
+# cut 5489
+# cut 5938
+# cut 6273
+# cut 631
+# cut 7128
+# cut 7454
+# cut 7900
+# cut 831
+# cut 897
+# cut 9191
+# cut 967
+# deal with increment 9
+# deal with increment 14
+# deal with increment 15
+# deal with increment 19
+# deal with increment 23
+# deal with increment 24
+# deal with increment 27
+# deal with increment 31
+# deal with increment 32
+# deal with increment 33
+# deal with increment 34
+# deal with increment 36
+# deal with increment 39
+# deal with increment 42
+# deal with increment 48
+# deal with increment 49
+# deal with increment 53
+# deal with increment 54
+# deal with increment 55
+# deal with increment 56
+# deal with increment 57
+# deal with increment 58
+# deal with increment 61
+# deal with increment 62
+# deal with increment 65
+# deal with increment 66
+# deal with increment 69
+# deal with increment 74
+# deal with increment 75
+
+#
