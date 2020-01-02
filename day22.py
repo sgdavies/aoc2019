@@ -4,9 +4,13 @@ logging.basicConfig()
 log = logging.getLogger()
 
 class Deck():
-    def __init__(self, size):
+    def __init__(self, size, debug=False):
         self.size = size
-        self.deck = list(range(size))
+        self.debug = debug
+
+        if self.debug:
+            self.deck = list(range(size))
+
         self.x_for_i = {}
         self.funs = []
         def identity(x): return x
@@ -18,7 +22,8 @@ class Deck():
 
     def do_instruction(self, instruction):
         if instruction == "deal into new stack":
-            self.deck = self.deck[::-1]
+            if self.debug:
+                self.deck = self.deck[::-1]
 
             last_f = self.funs[-1]
             def f(x): return last_f(self.size-1-x)
@@ -26,7 +31,9 @@ class Deck():
 
         elif instruction.startswith("cut "):
             cut_len = int(instruction[4:])
-            self._cut(cut_len)
+
+            if self.debug:
+                self._cut(cut_len)
 
             last_f = self.funs[-1]
             def f(x): return last_f(x+cut_len)
@@ -34,7 +41,9 @@ class Deck():
 
         elif instruction.startswith("deal with increment "):
             increment = int(instruction[len("deal with increment "):])
-            self._deal_with_increment(increment)
+
+            if self.debug:
+                self._deal_with_increment(increment)
 
             last_f = self.funs[-1]
             def f(x): return last_f(x*self.get_x_for_i(increment))
@@ -46,12 +55,35 @@ class Deck():
 
     def get_x_for_i(self, increment):
         if increment not in self.x_for_i:
-            for x in xrange(self.size):
-                if (x*increment)%self.size == 1:
-                    self.x_for_i[x] = increment
-                    self.x_for_i[increment] = x
-                    log.debug("x-for-i: {},{}".format(increment, x))
-                    break
+            def inverse(a, n):
+                # https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm
+                t=0; newt=1; r=n; newr=a
+
+                while newr != 0:
+                    quot = r // newr
+                    t, newt = newt, t - (quot*newt)
+                    r, newr = newr, r - (quot*newr)
+
+                if r > 1:
+                    assert(False), "{} is not invertible in {}".format(a, n)
+
+                if t < 0:
+                    t = t + n
+
+                return t
+
+            x = inverse(increment, self.size)
+            self.x_for_i[x] = increment
+            self.x_for_i[increment] = x
+
+            #x = 1
+            #while x < self.size:
+            #    if (x*increment)%self.size == 1:
+            #        self.x_for_i[x] = increment
+            #        self.x_for_i[increment] = x
+            #        log.debug("x-for-i: {},{}".format(increment, x))
+            #        break
+            #    x += 1
 
         return self.x_for_i[increment]
 
@@ -69,54 +101,48 @@ class Deck():
         self.deck = out
 
     def order(self):
+        assert(self.debug), "Can't show whole deck for large deck"
         return [self.card_at(i) for i in range(self.size)]
 
     def card_at(self, index):
-        try:
+        if self.debug:
             assert(self.card_at_fun(index) == self.deck[index])
-        except AssertionError:
-            import pdb; pdb.set_trace()
-            raise
-        return self.deck[index]
+        return self.card_at_fun(index)
 
     def card_at_fun(self, index):
         answer = self.funs[-1](index)
-        #log.debug(answer)
         answer = answer % self.size
-        #log.debug(answer)
-
-        #import pdb; pdb.set_trace()
         return answer
 
-def test(deck_size, instructions, answer):
-    deck = Deck(10)
+def test(deck_size, instructions, answer, debug=False):
+    deck = Deck(10, debug=debug)
     deck.shuffle(instructions)
 
     log.debug(deck.order())
     assert(" ".join([str(i) for i in deck.order()]) == answer)
 
 def tests():
-    log.setLevel(logging.DEBUG)
-    test(10, "deal into new stack", "9 8 7 6 5 4 3 2 1 0")
-    test(10, "cut 3", "3 4 5 6 7 8 9 0 1 2")
-    test(10, "cut -4", "6 7 8 9 0 1 2 3 4 5")
-    test(10, "deal with increment 3", "0 7 4 1 8 5 2 9 6 3")
+    #log.setLevel(logging.DEBUG)
+    test(10, "deal into new stack", "9 8 7 6 5 4 3 2 1 0", debug=True)
+    test(10, "cut 3", "3 4 5 6 7 8 9 0 1 2", debug=True)
+    test(10, "cut -4", "6 7 8 9 0 1 2 3 4 5", debug=True)
+    test(10, "deal with increment 3", "0 7 4 1 8 5 2 9 6 3", debug=True)
 
     example_one = """deal with increment 7
 deal into new stack
 deal into new stack"""
 
-    test(10, example_one, "0 3 6 9 2 5 8 1 4 7")
+    test(10, example_one, "0 3 6 9 2 5 8 1 4 7", debug=True)
 
     example_two = """cut 6
 deal with increment 7
 deal into new stack"""
-    test(10, example_two, "3 0 7 4 1 8 5 2 9 6")
+    test(10, example_two, "3 0 7 4 1 8 5 2 9 6", debug=True)
 
     example_three = """deal with increment 7
 deal with increment 9
 cut -2"""
-    test(10, example_three, "6 3 0 7 4 1 8 5 2 9")
+    test(10, example_three, "6 3 0 7 4 1 8 5 2 9", debug=True)
 
     example_four = """deal into new stack
 cut -2
@@ -128,7 +154,7 @@ cut 3
 deal with increment 9
 deal with increment 3
 cut -1"""
-    test(10, example_four, "9 2 5 8 1 4 7 0 3 6")
+    test(10, example_four, "9 2 5 8 1 4 7 0 3 6", debug=True)
 
     do_part_one()
 
@@ -236,7 +262,7 @@ cut 897
 deal with increment 36"""
 
 def do_part_one():
-    deck = Deck(10007)
+    deck = Deck(10007, debug=True)
     deck.shuffle(puzzle_input)
 
     assert(deck.card_at(7860) == 2019)
@@ -285,7 +311,7 @@ cut -98
 deal into new stack
 cut -69"""
 
-deck = Deck(587)
+deck = Deck(587, debug=True)
 deck.shuffle(inn)
 out = deck.order()
 
@@ -369,13 +395,37 @@ deal with increment 7"""
 # cut 5                 17: 3 9 2 8 1 7 0 6 12 5 11 4 10  c17=5
 # deal with increment 8 18: 3 7 11 2 6 10 1 5 9 0 4 8 12  x18=5
 # deal with increment 7 19: 3 11 6 1 9 4 12 7 2 10 5 0 8  x19=2
-deck = Deck(13)
+deck = Deck(13, debug=True)
 print(" ".join([str(x) for x in deck.order()]))
 for ins in inn.split('\n'):
     deck.shuffle(ins)
     print("{:25} {}".format(ins, " ".join([str(x) for x in deck.order()])))
 
 print("Done")
+
+
+
+import sys, time
+
+deck = Deck(119315717514047)
+# Seed the factors
+#for x in [9, 14, 15, 19, 23, 24, 27, 31, 32, 33, 34, 36, 39, 42, 48, 49, 53, 54, 55, 56, 57, 58, 61, 62, 65, 66, 69, 74, 75]:
+#    log.debug("Seeding", x); sys.stdout.flush()
+#    log.debug(deck.get_x_for_i(x))
+
+print("Starting shuffle on big deck"); sys.stdout.flush()
+
+for i in range(10):
+    start = time.time()
+    deck.shuffle(puzzle_input)
+    print("{} (took {:.1f}s)".format(deck.card_at(2020), time.time())); sys.stdout.flush()
+
+print("Done")
+
+
+
+
+
 
 
 # Need to map from inc->X
@@ -505,4 +555,5 @@ print("Done")
 # deal with increment 74
 # deal with increment 75
 
-#
+
+
