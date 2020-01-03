@@ -17,6 +17,9 @@ class Deck():
         def identity(x): return x
         self.funs.append(identity)
 
+        self.a = 1
+        self.b = 0
+
         self.shuffles = 0
 
         for instruction in instructions.split('\n'):
@@ -42,17 +45,33 @@ class Deck():
             def f(x): return last_f(self.size-1-x)
             self.funs.append(f)
 
+            a = -1
+            b = self.size -1
+            self.a *= a
+            self.b = b -self.b
+
         elif instruction.startswith("cut "):
             cut_len = int(instruction[4:])
             last_f = self.funs[-1]
             def f(x): return last_f(x+cut_len)
             self.funs.append(f)
 
+            a = 1
+            b = cut_len
+            self.a *= a
+            self.b += b
+
         elif instruction.startswith("deal with increment "):
             increment = int(instruction[len("deal with increment "):])
+            complement = self.get_x_for_i(increment)
             last_f = self.funs[-1]
-            def f(x): return last_f(x*self.get_x_for_i(increment))
+            def f(x): return last_f(x*complement)
             self.funs.append(f)
+
+            a = complement
+            b = 0
+            self.a *= a
+            self.b += b
 
         else:
             log.critical("Didn't understand instruction: '{}'".format(instruction))
@@ -87,13 +106,17 @@ class Deck():
     def card_at(self, index):
         if self.card_index is not None:
             assert (index is None or index==self.card_index), "Can't get value of different card"
-            return self.prev_cards[-1]
+            index = self.card_index
+            ans = self.prev_cards[-1]
 
         else:
             ans = self._card_at_fun(index)
             for i in range(1, self.shuffles):
                 ans = self._card_at_fun(ans)
-            return ans
+
+        log.debug("a: {}  b: {}  index: {}  value: {}".format(self.a, self.b, index, (index*self.a + self.b) % self.size))
+        assert(ans == (index*self.a + self.b) % self.size), "Linear equations didn't match"
+        return ans
 
     def _card_at_fun(self, index):
         answer = self.funs[-1](index)
@@ -153,12 +176,18 @@ def test(deck_size, instructions, answer):
     log.debug(deck.order())
     assert(" ".join([str(i) for i in deck.order()]) == answer)
 
+    deck = Deck(10, instructions)
+    deck.shuffle()
+    assert(" ".join([str(deck.card_at(i)) for i in range(10)]) == answer)
+
 def tests():
-    #log.setLevel(logging.DEBUG)
+    log.setLevel(logging.DEBUG)
     test(10, "deal into new stack", "9 8 7 6 5 4 3 2 1 0")
     test(10, "cut 3", "3 4 5 6 7 8 9 0 1 2")
     test(10, "cut -4", "6 7 8 9 0 1 2 3 4 5")
     test(10, "deal with increment 3", "0 7 4 1 8 5 2 9 6 3")
+
+    test(10, "deal into new stack\ndeal into new stack", "0 1 2 3 4 5 6 7 8 9")
 
     example_one = """deal with increment 7
 deal into new stack
@@ -450,6 +479,7 @@ print("Done")
 # (no 2, 4, 6, 8 or 5)
 # 0741852963 dwi 3 == 7*i mod 10 (10,3)->7
 # 0369258147 dwi 7 == 3*i mod 10 (10,7)->3
+# 0987654321 dwi 9 == 9*i mod 10 (10,9)->9
 # So 10->3,7
 #
 # 0123456 (7)
