@@ -5,18 +5,12 @@ logging.basicConfig()
 log = logging.getLogger()
 
 class Deck():
-    def __init__(self, size, instructions, card_index=None):
-        # Optionally pass in 'card index' to calculate the value as we go along
+    def __init__(self, size, instructions):
         self.size = size
+        self._prepare_shuffle(instructions)
 
-        self._prepare_shuffle(instructions, card_index)
-
-    def _prepare_shuffle(self, instructions, card_index):
+    def _prepare_shuffle(self, instructions):
         self.x_for_i = {}
-        self.funs = []
-        def identity(x): return x
-        self.funs.append(identity)
-
         self.a = 1
         self.b = 0
 
@@ -27,26 +21,11 @@ class Deck():
         for instruction in backwards_instructions:
             self.do_instruction(instruction)
 
-        self.card_index = card_index
-        if card_index is not None:
-            self.prev_cards = [card_index]
-            self.seen_cards = set([card_index])
-
     def shuffle(self):
         self.shuffles += 1
 
-        if self.card_index is not None:
-            next = self.funs[-1](self.prev_cards[-1]) % self.size
-            self.prev_cards.append(next)
-            if next in self.seen_cards:
-                print("Repeated at index {}".format(self.shuffles))
-
     def do_instruction(self, instruction):
         if instruction == "deal into new stack":
-            last_f = self.funs[-1]
-            def f(x): return last_f(self.size-1-x)
-            self.funs.append(f)
-
             # x' = (size-1) - x
             # => a'i+b' = -(ai+b) + (size-1)
             # => a' = -a, b' = -b + size-1
@@ -55,10 +34,6 @@ class Deck():
 
         elif instruction.startswith("cut "):
             cut_len = int(instruction[4:])
-            last_f = self.funs[-1]
-            def f(x): return last_f(x+cut_len)
-            self.funs.append(f)
-
             # x' = x + c
             # a'i + b' = a.i + b+c
             self.b += cut_len
@@ -66,10 +41,6 @@ class Deck():
         elif instruction.startswith("deal with increment "):
             increment = int(instruction[len("deal with increment "):])
             complement = self.get_x_for_i(increment)
-            last_f = self.funs[-1]
-            def f(x): return last_f(x*complement)
-            self.funs.append(f)
-
             # x' = c.x
             # a'i + b' = ca.i + cb
             self.a *= complement
@@ -106,29 +77,13 @@ class Deck():
         return self.x_for_i[increment]
 
     def card_at(self, index):
-        if self.card_index is not None:
-            assert (index is None or index==self.card_index), "Can't get value of different card"
-            index = self.card_index
-            ans = self.prev_cards[-1]
-
-        else:
-            ans = self._card_at_fun(index)
-            for i in range(1, self.shuffles):
-                ans = self._card_at_fun(ans)
-
-        log.debug("a: {}  b: {}  index: {}  value: {}".format(self.a, self.b, index, (index*self.a + self.b) % self.size))
-        #assert(ans == (index*self.a + self.b) % self.size), "Linear equations didn't match"
         ans = (index*self.a + self.b) % self.size
+        log.debug("a: {}  b: {}  index: {}  value: {}".format(self.a, self.b, index, ans))
         return ans
-
-    def _card_at_fun(self, index):
-        answer = self.funs[-1](index)
-        answer = answer % self.size
-        return answer
 
 
 class SimpleDeck(Deck):
-    def _prepare_shuffle(self, instructions, card_index):
+    def _prepare_shuffle(self, instructions):
         self.instructions = instructions
         self.deck = list(range(self.size))
 
@@ -184,7 +139,7 @@ def test(deck_size, instructions, answer):
     assert(" ".join([str(deck.card_at(i)) for i in range(10)]) == answer)
 
 def tests():
-    log.setLevel(logging.DEBUG)
+    # log.setLevel(logging.DEBUG)
     test(10, "deal into new stack", "9 8 7 6 5 4 3 2 1 0")
     test(10, "cut 3", "3 4 5 6 7 8 9 0 1 2")
     test(10, "cut -4", "6 7 8 9 0 1 2 3 4 5")
@@ -432,14 +387,14 @@ for ins in inn.split('\n'):
 # 'backwards' we could get there faster? (Assumes this is always a perfect
 # shuffle on any deck)
 size=10007
-deck = Deck(size, puzzle_input, card_index=7860)
+deck = Deck(size, puzzle_input)
 for i in range(size):
     deck.shuffle()
 
 print(deck.card_at(7860))
 
-# Needs to be 101741582076661 times in a row
-REPS=100
+#    101741582076661 times in a row
+REPS=1000000
 deck = Deck(119315717514047, puzzle_input)
 
 print("Starting shuffle on big deck"); sys.stdout.flush()
@@ -451,16 +406,6 @@ final_card = deck.card_at(2020)
 end = time.time()
 print("Done {} in {:.1f}s - {}".format(REPS, end-start, final_card))
 
-deck = Deck(119315717514047, puzzle_input, card_index=2020)
-
-print("Starting shuffle on big deck"); sys.stdout.flush()
-start = time.time()
-for i in range(REPS):
-    deck.shuffle()
-
-final_card = deck.card_at(None)
-end = time.time()
-print("Done {} in {:.1f}s - {}".format(REPS, end-start, final_card))
 print("Done")
 
 
