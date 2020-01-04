@@ -93,17 +93,20 @@ class Deck():
                 log.debug("a: {} digits, b: {} digits.  index: {}  value: {}".format(a_len, b_len, index, ans))
         return ans
 
-    def _calculate(self):
-        if self.shuffles==1:
-            # Easy case. Should fall out of the below as well, actually.
-            self.calculated_at = 1
-            return
+    def _calculate2(self):
+        # x{1} = ax{0} + b
+        # x{2} = ax{1} +b = a^2x{0} + ab + b
+        # x{n} = a^N  +  a^N-1.b + a^N-2.b +...+ab+b = a^N + b(sum a^k, k=0 to N-1)
+        # https://www.wolframalpha.com/input/?i=sum%20x%5Ek%2C%20k%3D0%20to%20n
+        # sum a^k, k=0 to N-1 = (a^N -1)/(a-1)
+        # So: we need to calculate a^N
+        # Then a{N} = a^N, b{N} = b.(a^N -1)/(a-1)
+        pass
 
+    def _calculate(self):
         # Define a load of helper functions to see where the time is going (profiling)
         def reduce_a(aa):
-            while aa % (self.size+1) == 0:
-                aa //= (self.size+1)
-            return aa
+            return (aa) % self.size
 
         def reduce_b(bb):
             return (bb) % self.size
@@ -146,7 +149,7 @@ class Deck():
 
         self.a = final_a
         self.b = final_b
-        print("{} shuffles: {} steps and {} calcs".format(self.shuffles, s1, s2))
+        log.info("{} shuffles: {} steps and {} calcs".format(self.shuffles, s1, s2))
 
 
 class SimpleDeck(Deck):
@@ -496,7 +499,7 @@ print("Done {} in {:.1f}s - {}".format(REPS, end-start, final_card))
 print("Done")
 
 def solve_puzzle(number_of_shuffles):
-    #    101741582076661 times in a row
+    
     deck = Deck(119315717514047, puzzle_input)
     REPS = number_of_shuffles
     deck.shuffles = REPS
@@ -504,12 +507,14 @@ def solve_puzzle(number_of_shuffles):
     final_card = deck.card_at(2020)
     print("Done {} in {:.1f}s - {}".format(REPS, time.time()-start, final_card))
 
-import cProfile
-REPS=4000
-if True:
+#    101741582076661 times in a row
+REPS=101741582076661
+if False:
+    import cProfile
     cProfile.run("solve_puzzle(REPS)", sort="cumulative")
 else:
     solve_puzzle(REPS)
+    # 61256063148970
 
 
 # Need to map from inc->X
