@@ -15,6 +15,7 @@ class Deck():
         self.b = 0
 
         self.shuffles = 0
+        self.calculated_at = 0
 
         backwards_instructions = instructions.split('\n')
         backwards_instructions.reverse()
@@ -77,9 +78,75 @@ class Deck():
         return self.x_for_i[increment]
 
     def card_at(self, index):
+        if self.calculated_at != self.shuffles:
+            self._calculate()
+            self.calculated_at = self.shuffles
         ans = (index*self.a + self.b) % self.size
-        log.debug("a: {}  b: {}  index: {}  value: {}".format(self.a, self.b, index, ans))
+
+        if log.level <= logging.DEBUG:
+            import math
+            a_len = int(math.log(self.a, 10)) if self.a>0 else 1
+            if a_len < 100:
+                log.debug("a: {}  b: {}  index: {}  value: {}".format(self.a, self.b, index, ans))
+            else:
+                b_len = int(math.log(self.b, 10)) if self.b>0 else 1
+                log.debug("a: {} digits, b: {} digits.  index: {}  value: {}".format(a_len, b_len, index, ans))
         return ans
+
+    def _calculate(self):
+        if self.shuffles==1:
+            # Easy case. Should fall out of the below as well, actually.
+            self.calculated_at = 1
+            return
+
+        # Define a load of helper functions to see where the time is going (profiling)
+        def reduce_a(aa):
+            while aa % (self.size+1) == 0:
+                aa //= (self.size+1)
+            return aa
+
+        def reduce_b(bb):
+            return (bb) % self.size
+
+        def next_cur_a(aa):
+            return reduce_a(aa*aa)
+
+        def next_cur_b(aa, bb):
+            return reduce_b(bb*(aa+1))
+
+        def next_final_a(fa, ca):
+            return reduce_a(fa*ca)
+
+        def next_final_b(fa, fb, cb):
+            return reduce_b(fa*cb + fb)
+
+        s1=0
+        s2=0
+        cur_a = self.a
+        cur_b = self.b
+        final_a = 1
+        final_b = 0
+        pos = 1
+        while pos <= self.shuffles:
+            # 
+            s1+=1
+            if pos & self.shuffles:
+                s2+=1
+                # m = prev value (final_), n = next (cur_)
+                # a{n+m} = a{n} + a{m}
+                # b{n+m} = a{m}.b{n} + b{m}
+                final_b = next_final_b(final_a, final_b, cur_b) # reduce_b(final_a*cur_b + final_b)
+                final_a = next_final_a(final_a, cur_a)          # reduce_a(final_a*cur_a)
+
+            # calc the next a and b
+            cur_b = next_cur_b(cur_a, cur_b)    # reduce_b(cur_b*(cur_a + 1))
+            cur_a = next_cur_a(cur_a)           # reduce_a(cur_a*cur_a)
+
+            pos *= 2
+
+        self.a = final_a
+        self.b = final_b
+        print("{} shuffles: {} steps and {} calcs".format(self.shuffles, s1, s2))
 
 
 class SimpleDeck(Deck):
@@ -138,6 +205,27 @@ def test(deck_size, instructions, answer):
     deck.shuffle()
     assert(" ".join([str(deck.card_at(i)) for i in range(10)]) == answer)
 
+
+inn13 = """deal with increment 5
+deal with increment 2
+cut -4
+deal with increment 4
+cut 12
+deal with increment 7
+deal with increment 8
+cut -7
+cut -12
+deal with increment 2
+deal into new stack
+deal with increment 5
+deal with increment 4
+deal into new stack
+deal with increment 7
+deal into new stack
+cut 5
+deal with increment 8
+deal with increment 7"""
+
 def tests():
     # log.setLevel(logging.DEBUG)
     test(10, "deal into new stack", "9 8 7 6 5 4 3 2 1 0")
@@ -176,6 +264,24 @@ cut -1"""
     test(10, example_four, "9 2 5 8 1 4 7 0 3 6")
 
     do_part_one()
+
+    # Repeated shuffling
+    # How do a/b change after repeated invocations?
+    # log.setLevel(logging.DEBUG)
+    N=107
+    log.debug("Doing {} shuffles".format(N))
+    deck = Deck(13, inn13)
+    simple_deck = SimpleDeck(13, inn13)
+    for rep in range(N):
+        deck.shuffle()
+        simple_deck.shuffle()
+
+    simple_deck_answer = " ".join([str(simple_deck.card_at(x)) for x in range(13)])
+    log.debug(simple_deck_answer)
+    deck_answer = " ".join([str(deck.card_at(x)) for x in range(13)])
+    log.debug(deck_answer)
+    log.debug("{}, {}".format(deck.a, deck.b))
+    assert(deck_answer == simple_deck_answer), "Decks not equal after shuffling"
 
     log.critical("All tests passed")
 
@@ -333,25 +439,6 @@ if __name__ == "__main__":
 # 4321065 dwi 3 (X=5)  x1(x2*i+c2)+c1
 
 # Deck of 13
-inn = """deal with increment 5
-deal with increment 2
-cut -4
-deal with increment 4
-cut 12
-deal with increment 7
-deal with increment 8
-cut -7
-cut -12
-deal with increment 2
-deal into new stack
-deal with increment 5
-deal with increment 4
-deal into new stack
-deal with increment 7
-deal into new stack
-cut 5
-deal with increment 8
-deal with increment 7"""
 #                       0:  0 1 2 3 4 5 6 7 8 9 10 11 12
 # deal with increment 5 1:  0 8 3 11 6 1 9 4 12 7 2 10 5  x1=8    a=x1.i = 8i
 # deal with increment 2 2:  0 4 8 12 3 7 11 2 6 10 1 5 9  x2=7    a=x1.x2.i = 56i
@@ -375,7 +462,7 @@ deal with increment 7"""
 
 deck = SimpleDeck(13, None)
 log.debug(" ".join([str(x) for x in deck.order()]))
-for ins in inn.split('\n'):
+for ins in inn13.split('\n'):
     deck.do_instruction(ins)
     log.debug("{:25} {}".format(ins, " ".join([str(x) for x in deck.order()])))
 
@@ -386,15 +473,15 @@ for ins in inn.split('\n'):
 # Repeats after 10006 shuffles.  This suggests that if we could shuffle
 # 'backwards' we could get there faster? (Assumes this is always a perfect
 # shuffle on any deck)
-size=10007
-deck = Deck(size, puzzle_input)
-for i in range(size):
-    deck.shuffle()
+# size=10007
+# deck = Deck(size, puzzle_input)
+# for i in range(size):
+#     deck.shuffle()
 
-print(deck.card_at(7860))
+# print(deck.card_at(7860))
 
 #    101741582076661 times in a row
-REPS=1000000
+REPS=10
 deck = Deck(119315717514047, puzzle_input)
 
 print("Starting shuffle on big deck"); sys.stdout.flush()
@@ -408,10 +495,21 @@ print("Done {} in {:.1f}s - {}".format(REPS, end-start, final_card))
 
 print("Done")
 
+def solve_puzzle(number_of_shuffles):
+    #    101741582076661 times in a row
+    deck = Deck(119315717514047, puzzle_input)
+    REPS = number_of_shuffles
+    deck.shuffles = REPS
+    start = time.time()
+    final_card = deck.card_at(2020)
+    print("Done {} in {:.1f}s - {}".format(REPS, time.time()-start, final_card))
 
-
-
-
+import cProfile
+REPS=4000
+if True:
+    cProfile.run("solve_puzzle(REPS)", sort="cumulative")
+else:
+    solve_puzzle(REPS)
 
 
 # Need to map from inc->X
