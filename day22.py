@@ -22,7 +22,9 @@ class Deck():
 
         self.shuffles = 0
 
-        for instruction in instructions.split('\n'):
+        backwards_instructions = instructions.split('\n')
+        backwards_instructions.reverse()
+        for instruction in backwards_instructions:
             self.do_instruction(instruction)
 
         self.card_index = card_index
@@ -45,10 +47,11 @@ class Deck():
             def f(x): return last_f(self.size-1-x)
             self.funs.append(f)
 
-            a = -1
-            b = self.size -1
-            self.a *= a
-            self.b = b -self.b
+            # x' = (size-1) - x
+            # => a'i+b' = -(ai+b) + (size-1)
+            # => a' = -a, b' = -b + size-1
+            self.a = -self.a
+            self.b = (self.size - 1) - self.b
 
         elif instruction.startswith("cut "):
             cut_len = int(instruction[4:])
@@ -56,10 +59,9 @@ class Deck():
             def f(x): return last_f(x+cut_len)
             self.funs.append(f)
 
-            a = 1
-            b = cut_len
-            self.a *= a
-            self.b += b
+            # x' = x + c
+            # a'i + b' = a.i + b+c
+            self.b += cut_len
 
         elif instruction.startswith("deal with increment "):
             increment = int(instruction[len("deal with increment "):])
@@ -68,10 +70,10 @@ class Deck():
             def f(x): return last_f(x*complement)
             self.funs.append(f)
 
-            a = complement
-            b = 0
-            self.a *= a
-            self.b += b
+            # x' = c.x
+            # a'i + b' = ca.i + cb
+            self.a *= complement
+            self.b *= complement
 
         else:
             log.critical("Didn't understand instruction: '{}'".format(instruction))
@@ -115,7 +117,8 @@ class Deck():
                 ans = self._card_at_fun(ans)
 
         log.debug("a: {}  b: {}  index: {}  value: {}".format(self.a, self.b, index, (index*self.a + self.b) % self.size))
-        assert(ans == (index*self.a + self.b) % self.size), "Linear equations didn't match"
+        #assert(ans == (index*self.a + self.b) % self.size), "Linear equations didn't match"
+        ans = (index*self.a + self.b) % self.size
         return ans
 
     def _card_at_fun(self, index):
