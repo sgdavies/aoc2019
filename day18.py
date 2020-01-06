@@ -6,8 +6,23 @@ class Dungeon():
         self.map_str = map_str
         self.parse_map(map_str)
         self.create_tree()  # All the examples & puzzle are trees, not looping graphs.
-        # import pdb; pdb.set_trace()
         self.count_doors_keys_and_depth(self.tree)
+
+        def no_keys_here(node):
+            # Split out for the debugger
+            if isinstance(node, TreeKey):
+                ret = False
+            elif node.keys_below==0:
+                ret = True
+            else:
+                ret = False
+
+            if DEBUG: print("{}: {} ({}, {})".format(node.name, ret, isinstance(node, TreeKey), node.keys_below))
+            return ret
+
+        if False and DEBUG:
+            import pdb; pdb.set_trace()
+        self.tree.prune(no_keys_here)
 
     def parse_map(self, map_str):
         # Read in the text.
@@ -64,6 +79,7 @@ class Dungeon():
         root = self.find_node('@')
         nodes_visited.add(root)
         self.tree = TreeNode(None, 0, root.x, root.y, name=root.name)
+        self.name_to_tree_node = {self.tree.name: self.tree}
         self.create_child_nodes(root, self.tree, nodes_visited, edges_used)
 
     def create_child_nodes(self, node, tree_node, nodes_visited, edges_used):
@@ -96,26 +112,35 @@ class Dungeon():
             else:
                 child_tree_node = TreeNode(tree_node, edge.weight, child_node.x, child_node.y)
 
+            self.name_to_tree_node[child_tree_node.name] = child_tree_node
             self.create_child_nodes(child_node, child_tree_node, nodes_visited, edges_used)
 
-    def show_tree(self):
+    def show_tree(self, mode=None):
         # Print a summarized tree view of the dungeon
         # @-*-A-b
         # | |-a
         # | |-g
         # |-c-D-e
         #   |-d
-        out_str = self._build_show_tree(self.tree, True, "", "")
+        out_str = self._build_show_tree(self.tree, True, "", "", mode)
 
         print(out_str)  # cut off first '-'
 
-    def _build_show_tree(self, node, first, stem, out_str):
+    def _build_show_tree(self, node, first, stem, out_str, mode):
         # node - the node to add (and its descendents)
         # first - true if this is the first child of its parent (so don't add the stem)
         # stem - 
-        extra_len = ""
         name = node.name if len(node.name)==1 else '*'
-        if extra_len: name += "{:->2}".format(node.keys_below)
+
+        if mode is None:
+            extra_len = ""
+        elif mode=="cost":
+            extra_len = "  "
+            name = "{:->2}".format(node.cost) + name
+        elif mode=="keys":
+            extra_len = "  "
+            name += "{: <2}".format(node.keys_below)
+
         if first:
             out_str += '-' + name
         else:
@@ -128,7 +153,7 @@ class Dungeon():
                     next_stem = stem + extra_len + "  "
                 else:
                     next_stem = stem + extra_len + " |"
-                out_str = self._build_show_tree(child, i==0, next_stem, out_str)
+                out_str = self._build_show_tree(child, i==0, next_stem, out_str, mode)
         else:
             out_str += '\n'
 
@@ -425,6 +450,16 @@ class TreeNode():
     def add_child(self, child):
         self.children.append(child)
 
+    def prune(self, predicate):
+        # if predicate(self):
+        #     self.parent.children.remove(self)
+        # else:
+        for child in list(self.children):  # list necessary?
+            if predicate(child):
+                self.children.remove(child)
+            else:
+                child.prune(predicate)
+
 
 class TreeDoor(TreeNode):
     def __init__(self, *args, **kwargs):
@@ -646,6 +681,8 @@ puzzle = """####################################################################
 # cProfile:
 # 4.543    0.045 copy.py:128(deepcopy)
 # 3.294    0.033 day18.py:301(create_dungeon)
-
+# DEBUG=True
 dungeon = Dungeon(puzzle)
+dungeon.show_tree(mode="keys")
+dungeon.show_tree(mode="cost")
 dungeon.show_tree()
