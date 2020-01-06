@@ -6,6 +6,8 @@ class Dungeon():
         self.map_str = map_str
         self.parse_map(map_str)
         self.create_tree()  # All the examples & puzzle are trees, not looping graphs.
+        # import pdb; pdb.set_trace()
+        self.count_doors_keys_and_depth(self.tree)
 
     def parse_map(self, map_str):
         # Read in the text.
@@ -55,7 +57,7 @@ class Dungeon():
         # as well as self.find_node('@') (the root node).
         # We want to build a set of TreeNodes starting at the root. Each TreeNode has a parent (None for the root),
         # a list of children, and a cost (distance to parent). Also a name.
-        # For each node in our graph, create a mirror tree node for it and add it to the tree.
+        # For each node in our graph, create an equivalent tree node for it and add it to the tree.
         # Check that no node is added twice - if it is, this isn't a tree after all.
         nodes_visited = set()
         edges_used = set()
@@ -95,6 +97,61 @@ class Dungeon():
                 child_tree_node = TreeNode(tree_node, edge.weight, child_node.x, child_node.y)
 
             self.create_child_nodes(child_node, child_tree_node, nodes_visited, edges_used)
+
+    def show_tree(self):
+        # Print a summarized tree view of the dungeon
+        # @-*-A-b
+        # | |-a
+        # | |-g
+        # |-c-D-e
+        #   |-d
+        out_str = self._build_show_tree(self.tree, True, "", "")
+
+        print(out_str)  # cut off first '-'
+
+    def _build_show_tree(self, node, first, stem, out_str):
+        # node - the node to add (and its descendents)
+        # first - true if this is the first child of its parent (so don't add the stem)
+        # stem - 
+        extra_len = ""
+        name = node.name if len(node.name)==1 else '*'
+        if extra_len: name += "{:->2}".format(node.keys_below)
+        if first:
+            out_str += '-' + name
+        else:
+            out_str += stem + '-' + name
+
+        if node.children:
+            for i, child in enumerate(node.children):
+                if i == len(node.children) -1:
+                    # Last node - don't put in the vertical bar
+                    next_stem = stem + extra_len + "  "
+                else:
+                    next_stem = stem + extra_len + " |"
+                out_str = self._build_show_tree(child, i==0, next_stem, out_str)
+        else:
+            out_str += '\n'
+
+        return out_str
+
+    def count_doors_keys_and_depth(self, node):
+        total_doors = 0
+        total_keys = 0
+        max_depth = 0
+        for child in node.children:
+            self.count_doors_keys_and_depth(child)
+            total_doors += child.doors_below
+            if isinstance(child, TreeDoor): total_doors += 1
+
+            total_keys += child.keys_below
+            if isinstance(child, TreeKey): total_keys += 1
+            
+            if child.max_depth_below + child.cost > max_depth:
+                max_depth = child.max_depth_below + child.cost
+
+        node.doors_below = total_doors
+        node.keys_below = total_keys
+        node.max_depth_below = max_depth
 
     def add_node(self, node):
         self.nodes.add(node)
@@ -356,8 +413,17 @@ class TreeNode():
         self.x = x
         self.y = y
 
+        # Filled out later (when whole tree exists) by count_doors_keys_and_depth()
+        self.doors_below = 0
+        self.keys_below = 0
+        self.max_depth_below = 0
+
         self.name = name if name else "T{}.{}".format(x,y)
         self.children = children if children else []
+        if self.parent: self.parent.add_child(self)
+
+    def add_child(self, child):
+        self.children.append(child)
 
 
 class TreeDoor(TreeNode):
@@ -431,11 +497,17 @@ def solve_dungeon(mapp, quiet=True, repeats=1):
 
     return lowest_distance
 
+def show_tree(mapp):
+    print(mapp)
+    print()
+    Dungeon(mapp).show_tree()
+
 # Best is 8
 example_1 = """#########
 #b.A.@.a#
 #########"""
 print(solve_dungeon(example_1, repeats=10), "vs", 8)
+show_tree(example_1)
 
 # Best is 86
 example_2="""########################
@@ -444,6 +516,7 @@ example_2="""########################
 #d.....................#
 ########################"""
 print(solve_dungeon(example_2, repeats=10), "vs", 86)
+# show_tree(example_2)
 
 # Best is 132
 example_3 = """########################
@@ -452,6 +525,7 @@ example_3 = """########################
 #.....@.a.B.c.d.A.e.F.g#
 ########################"""
 print(solve_dungeon(example_3, repeats=10), "vs", 132)
+# show_tree(example_3)
 
 # Best is 136
 example_4 = """#################
@@ -464,6 +538,7 @@ example_4 = """#################
 #l.F..d...h..C.m#
 #################"""
 print(solve_dungeon(example_4, repeats=10), "vs", 136)
+show_tree(example_4)
 
 # Best is 81
 example_5 = """########################
@@ -473,6 +548,9 @@ example_5 = """########################
 ###g#h#i################
 ########################"""
 print(solve_dungeon(example_5, repeats=10), "vs", 81)
+show_tree(example_5)
+
+# exit()
 
 # Part 1 puzzle
 puzzle = """#################################################################################
@@ -556,15 +634,18 @@ puzzle = """####################################################################
 #.#.#.#.#.#########.#########.#.#.#.###.###.###########.###########.#####.###.#.#
 #.....#.#...................#.O...#.....#...............#...........N.....#.....#
 #################################################################################"""
-print(solve_dungeon(puzzle, repeats=10))
+# print(solve_dungeon(puzzle, repeats=10))
 
-import time, sys
-import cProfile
-N=10
-# cProfile.run('run_for_N(N)')
-cProfile.run('solve_dungeon(puzzle, quiet=True, repeats=N)')
+# import time, sys
+# import cProfile
+# N=10
+# # cProfile.run('run_for_N(N)')
+# cProfile.run('solve_dungeon(puzzle, quiet=True, repeats=N)')
 
 # Interestingly: copy.deepcopy(dungeon) is slower than dungeon=Dungeon(parse)
 # cProfile:
 # 4.543    0.045 copy.py:128(deepcopy)
 # 3.294    0.033 day18.py:301(create_dungeon)
+
+dungeon = Dungeon(puzzle)
+dungeon.show_tree()
