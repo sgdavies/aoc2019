@@ -1,5 +1,5 @@
 DEBUG=False
-import copy, random
+import copy, random, sys, collections
 
 class Dungeon():
     def __init__(self, map_str):
@@ -23,6 +23,18 @@ class Dungeon():
         if False and DEBUG:
             import pdb; pdb.set_trace()
         self.tree.prune(no_keys_here)
+
+        def boring_node(tree_node):
+            if len(tree_node.children) == 1:
+                if not isinstance(tree_node, TreeDoor) and not isinstance(tree_node, TreeKey):
+                    tree_node.remove()
+                elif isinstance(tree_node, TreeKey) and self.find_tree_node(tree_node.door_name()) is None and tree_node.keys_below > 0:
+                    # Although it's a key, it's not a leaf and it doesn't open any doors, so change to a regular node
+                    # (It must be picked up at some point when collecting the leaf)
+                    tree_node.remove()
+
+        self.tree.consolidate(boring_node)
+        self.count_doors_keys_and_depth(self.tree)
 
     def parse_map(self, map_str):
         # Read in the text.
@@ -160,6 +172,9 @@ class Dungeon():
         return out_str
 
     def count_doors_keys_and_depth(self, node):
+        # Find out the number of keys below this node, the number of
+        # doors beneath this node, and the maximum distance to the 
+        # lowest key (i.e. the farthest leaf) below this node.
         total_doors = 0
         total_keys = 0
         max_depth = 0
@@ -295,6 +310,30 @@ class Dungeon():
         # assert(len(nodes)==1)
         # return nodes[0]
         return self.node_names_to_node.get(name, None)
+
+    def find_tree_node(self, name):
+        return self.name_to_tree_node.get(name, None)
+
+    def open_tree_door(self, key_node):
+        if door := self.find_tree_node(key_node.door_name()):
+            door.remove()
+
+    def visible_tree_nodes(self, from_node=None, acc=None):
+        # 'visible' means not hidden behind a door
+        # Because it's a tree, and we start at the root, from wherever we are we can see the same as the root can see.
+        if from_node is None: from_node = self.tree
+        if acc is None: acc = []
+
+        acc.append(from_node)
+
+        for child in from_node.children:
+            if not isinstance(child, TreeDoor):
+                self.visible_tree_nodes(child, acc)
+
+        return acc
+
+    def visible_tree_keys(self):
+        return [node for node in self.visible_tree_nodes() if isinstance(node, TreeKey)]
 
     def visible_doors(self, from_node):
         # Return a list of door-nodes visible from this node.
@@ -450,15 +489,71 @@ class TreeNode():
     def add_child(self, child):
         self.children.append(child)
 
+    def remove(self):
+        # Remove this node from the tree, by joining the children to the parent
+        # a-(*)-b  ==>  a-b
+        # and a-(*)-b  ==>  a-b
+        #         \-c       \-c
+        if not self.parent:
+            # Don't remove the root node
+            # log.debug("Can't remove the root node")
+            return
+
+        for child in self.children:
+            child.parent = self.parent
+            child.cost += self.cost
+            child.parent.add_child(child)
+
+        try:
+            self.parent.children.remove(self)
+        except ValueError:
+            import pdb; pdb.set_trace()
+
+    def consolidate(self, predicate):
+        # Join together boring nodes below here - nodes that aren't doors, keys, or junctions
+        # (or rather, nodes that satisfy the passed-in predicate)
+        # I.e. a-*-*-b-*-c ==> a-b-*-c
+        #              \-d         \-d
+        if predicate(self):
+            self.remove()
+
+        for child in list(self.children):
+            child.consolidate(predicate)
+
     def prune(self, predicate):
-        # if predicate(self):
-        #     self.parent.children.remove(self)
-        # else:
+        # Remove all children that satisfy `predicate` from the tree
         for child in list(self.children):  # list necessary?
             if predicate(child):
                 self.children.remove(child)
             else:
                 child.prune(predicate)
+
+    def distance(self, other_node):
+        # find the common parent, then add the two legs
+        # one may be an ancestor of the other
+        my_ancestors = self._ancestor_distances()
+        thy_ancestors = other_node._ancestor_distances()
+
+        if other_node in my_ancestors:
+            return my_ancestors[other_node]
+
+        # import pdb;pdb.set_trace()
+        for ancestor, dist in my_ancestors.items():
+            if ancestor in thy_ancestors:
+                return dist + thy_ancestors[ancestor]
+
+    def _ancestor_distances(self, acc=None):
+        # return an OrderedDict of ancestors, and total distance to those ancestors
+        # (root)-1-A-2-B-3-C-4-(this) ==> {(C,4), (B,7), (A,9), (root,10)}
+        if acc is None:
+            acc = collections.OrderedDict()
+            acc[self] = 0
+
+        if self.parent:
+            acc[self.parent] = self.cost
+            self.parent._ancestor_distances(acc)
+
+        return acc
 
 
 class TreeDoor(TreeNode):
@@ -485,11 +580,37 @@ class TreeKey(TreeNode):
 def create_dungeon(mapp):
     return Dungeon(mapp)
 
+def solve_tree_dungeon(dungeon, starting_order=""):
+    distance_travelled = 0
+    path = "@"
+    choices = 1
+    current = dungeon.find_tree_node('@')
+
+    while keys_available := dungeon.visible_tree_keys():
+        choices *= len(keys_available)
+        # next_key = keys_available[0]  # Arbitrary
+        next_key = random.choice(keys_available)
+
+        path += next_key.name
+        distance_travelled += current.distance(next_key)
+        dungeon.open_tree_door(next_key)
+        next_key.remove()
+
+        current = next_key
+        print (distance_travelled, current.name, path); sys.stdout.flush()
+
+    # print(choices)
+    # print(path)
+    # print(distance_travelled)
+    return distance_travelled, path, choices
+
 def solve_the_dungeon(dungeon, quiet=False):
+    # Returns best_distance, path, choices
     pacman_is_at = dungeon.find_node('@')
     remaining_keys = set(dungeon.keys)
     distance_travelled = 0
     choices = 1
+    path="@"
 
     # Would be good to modify this to not affect the underlying graph - then it would be faster to do repeats
     try:
@@ -501,6 +622,7 @@ def solve_the_dungeon(dungeon, quiet=False):
 
             # Pick up a key, then 'open' the relevant door - i.e. remove that door node.
             next_key = random.choice(visible_keys)
+            path += next_key.name
             distance_travelled += dungeon.minimum_distance(pacman_is_at, next_key)
             pacman_is_at = next_key
             newly_opened_door = dungeon.find_node(next_key.door_name())
@@ -517,19 +639,25 @@ def solve_the_dungeon(dungeon, quiet=False):
         raise
 
     if not quiet: print("Had {} choices; picked a route of length {}".format(choices, distance_travelled))
-    return distance_travelled
+    return distance_travelled, path, choices
 
 
-def solve_dungeon(mapp, quiet=True, repeats=1):
+def solve_dungeon(mapp, solver, quiet=True, repeats=1):
+    # dungeon = create_dungeon(mapp)
+    # solve_tree_dungeon(dungeon)
+
     lowest_distance = None
+    best_path = None
     for repeat in range(repeats):
         # test_dungeon = copy.deepcopy(dungeon)  # Slower than create_dungeon()
         dungeon = create_dungeon(mapp)
-        distance = solve_the_dungeon(dungeon, quiet=quiet)
+        distance, path, choices = solver(dungeon) # TODO, quiet=quiet)
 
         if lowest_distance is None or distance < lowest_distance:
             lowest_distance = distance
+            best_path = path
 
+    print(lowest_distance, path, choices)
     return lowest_distance
 
 def show_tree(mapp):
@@ -541,7 +669,7 @@ def show_tree(mapp):
 example_1 = """#########
 #b.A.@.a#
 #########"""
-print(solve_dungeon(example_1, repeats=10), "vs", 8)
+print(solve_dungeon(example_1, solve_tree_dungeon, repeats=10), "vs", 8)
 show_tree(example_1)
 
 # Best is 86
@@ -550,8 +678,9 @@ example_2="""########################
 ######################.#
 #d.....................#
 ########################"""
-print(solve_dungeon(example_2, repeats=10), "vs", 86)
-# show_tree(example_2)
+print(solve_dungeon(example_2, solve_tree_dungeon, repeats=10), "vs", 86)
+show_tree(example_2)
+exit()  # @@@ continue here - (1) distance calcs are wrong; (2) collect all keys when moving
 
 # Best is 132
 example_3 = """########################
@@ -559,7 +688,7 @@ example_3 = """########################
 #.######################
 #.....@.a.B.c.d.A.e.F.g#
 ########################"""
-print(solve_dungeon(example_3, repeats=10), "vs", 132)
+print(solve_dungeon(example_3, solve_tree_dungeon, repeats=10), "vs", 132)
 # show_tree(example_3)
 
 # Best is 136
@@ -572,7 +701,7 @@ example_4 = """#################
 ########.########
 #l.F..d...h..C.m#
 #################"""
-print(solve_dungeon(example_4, repeats=10), "vs", 136)
+print(solve_dungeon(example_4, solve_tree_dungeon, repeats=10), "vs", 136)
 show_tree(example_4)
 
 # Best is 81
@@ -582,10 +711,10 @@ example_5 = """########################
 ###A#B#C################
 ###g#h#i################
 ########################"""
-print(solve_dungeon(example_5, repeats=10), "vs", 81)
+print(solve_dungeon(example_5, solve_tree_dungeon, repeats=10), "vs", 81)
 show_tree(example_5)
 
-# exit()
+exit()
 
 # Part 1 puzzle
 puzzle = """#################################################################################
