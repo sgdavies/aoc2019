@@ -36,6 +36,8 @@ class Dungeon():
         self.tree.consolidate(boring_node)
         self.count_doors_keys_and_depth(self.tree)
 
+        self.keys_collected = set()
+
     def parse_map(self, map_str):
         # Read in the text.
         # Record locations of floor, doors, keys, and entrance.
@@ -314,9 +316,12 @@ class Dungeon():
     def find_tree_node(self, name):
         return self.name_to_tree_node.get(name, None)
 
-    def open_tree_door(self, key_node):
+    def pick_up_key(self, key_node):
+        # open the door, and add the key to our list of collected keys
         if door := self.find_tree_node(key_node.door_name()):
             door.remove()
+
+        self.keys_collected.add(key_node)
 
     def visible_tree_nodes(self, from_node=None, acc=None):
         # 'visible' means not hidden behind a door
@@ -333,7 +338,7 @@ class Dungeon():
         return acc
 
     def visible_tree_keys(self):
-        return [node for node in self.visible_tree_nodes() if isinstance(node, TreeKey)]
+        return [node for node in self.visible_tree_nodes() if (isinstance(node, TreeKey) and node not in self.keys_collected)]
 
     def visible_doors(self, from_node):
         # Return a list of door-nodes visible from this node.
@@ -507,6 +512,9 @@ class TreeNode():
         try:
             self.parent.children.remove(self)
         except ValueError:
+            import traceback
+            traceback.print_stack()
+            print(traceback.format_exc())
             import pdb; pdb.set_trace()
 
     def consolidate(self, predicate):
@@ -534,6 +542,9 @@ class TreeNode():
         my_ancestors = self._ancestor_distances()
         thy_ancestors = other_node._ancestor_distances()
 
+        # print([(k.name, v) for k,v in my_ancestors.items()])
+        # print([(k.name, v) for k,v in thy_ancestors.items()])
+
         if other_node in my_ancestors:
             return my_ancestors[other_node]
 
@@ -550,7 +561,7 @@ class TreeNode():
             acc[self] = 0
 
         if self.parent:
-            acc[self.parent] = self.cost
+            acc[self.parent] = list(acc.values())[-1] + self.cost
             self.parent._ancestor_distances(acc)
 
         return acc
@@ -593,11 +604,12 @@ def solve_tree_dungeon(dungeon, starting_order=""):
 
         path += next_key.name
         distance_travelled += current.distance(next_key)
-        dungeon.open_tree_door(next_key)
-        next_key.remove()
+        dungeon.pick_up_key(next_key)
+        # next_key.remove()  # Replaced by just keeping track of collected keys (prevents destroying the map we're looking at)
+        # TODO : consider doing similar for doors (and update visible_X() methods to skip over opened doors)
 
         current = next_key
-        print (distance_travelled, current.name, path); sys.stdout.flush()
+        # print (distance_travelled, current.name, path); sys.stdout.flush()
 
     # print(choices)
     # print(path)
@@ -663,7 +675,9 @@ def solve_dungeon(mapp, solver, quiet=True, repeats=1):
 def show_tree(mapp):
     print(mapp)
     print()
-    Dungeon(mapp).show_tree()
+    dungeon = Dungeon(mapp)
+    dungeon.show_tree()
+    dungeon.show_tree(mode="cost")
 
 # Best is 8
 example_1 = """#########
@@ -679,8 +693,7 @@ example_2="""########################
 #d.....................#
 ########################"""
 print(solve_dungeon(example_2, solve_tree_dungeon, repeats=10), "vs", 86)
-show_tree(example_2)
-exit()  # @@@ continue here - (1) distance calcs are wrong; (2) collect all keys when moving
+# show_tree(example_2)
 
 # Best is 132
 example_3 = """########################
@@ -692,6 +705,7 @@ print(solve_dungeon(example_3, solve_tree_dungeon, repeats=10), "vs", 132)
 # show_tree(example_3)
 
 # Best is 136
+# Approx 2e11 choices...
 example_4 = """#################
 #i.G..c...e..H.p#
 ########.########
@@ -701,8 +715,8 @@ example_4 = """#################
 ########.########
 #l.F..d...h..C.m#
 #################"""
-print(solve_dungeon(example_4, solve_tree_dungeon, repeats=10), "vs", 136)
-show_tree(example_4)
+print(solve_dungeon(example_4, solve_tree_dungeon, repeats=1000), "vs", 136)
+# show_tree(example_4)
 
 # Best is 81
 example_5 = """########################
@@ -712,9 +726,9 @@ example_5 = """########################
 ###g#h#i################
 ########################"""
 print(solve_dungeon(example_5, solve_tree_dungeon, repeats=10), "vs", 81)
-show_tree(example_5)
+# show_tree(example_5)
 
-exit()
+# exit()
 
 # Part 1 puzzle
 puzzle = """#################################################################################
@@ -815,3 +829,48 @@ dungeon = Dungeon(puzzle)
 dungeon.show_tree(mode="keys")
 dungeon.show_tree(mode="cost")
 dungeon.show_tree()
+
+# Continue here : hitting a ValueError in node.remove() for some reason (door 'F')
+# F is in a dead-end after 'h'
+# -@-*-C-m-k
+#    |-*-*-c
+#    | | |-K-*-b
+#    | | |    -n-s-o-X-v-J-*-u
+#    | | |                  -Q-p-f
+#    | |  -*-Y-x
+#    | |    -g-t-I-E-V-*-U-q-P-z-h
+#    | |                -j
+#    |  -l-M-D-a-R-S-O-y
+#     -d-r-w-G-T-i-e
+
+#   File "day18.py", line 834, in <module>
+#     print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+#   File "day18.py", line 666, in solve_dungeon
+#     distance, path, choices = solver(dungeon) # TODO, quiet=quiet)
+#   File "day18.py", line 607, in solve_tree_dungeon
+#     dungeon.pick_up_key(next_key)
+#   File "day18.py", line 322, in pick_up_key
+#     door.remove()
+#   File "day18.py", line 516, in remove
+#     traceback.print_stack()
+# Traceback (most recent call last):
+#   File "day18.py", line 513, in remove
+#     self.parent.children.remove(self)
+# ValueError: list.remove(x): x not in list
+
+# --Return--
+# > c:\users\sam\documents\code\aoc2019\day18.py(518)remove()->None
+# -> import pdb; pdb.set_trace()
+# (Pdb) self.name
+# 'F'
+# (Pdb) self.parent.name
+# 'h'
+# (Pdb) [x.name for x in self.parent.children]
+# []
+# (Pdb)
+
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
