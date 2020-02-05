@@ -8,6 +8,9 @@ class Dungeon():
         self.create_tree()  # All the examples & puzzle are trees, not looping graphs.
         self.count_doors_keys_and_depth(self.tree)
 
+        self.pacman_location = self.name_to_tree_node['@']
+        self.pacman_distance = 0
+
         def no_keys_here(node):
             # Split out for the debugger
             if isinstance(node, TreeKey):
@@ -143,7 +146,7 @@ class Dungeon():
     def _build_show_tree(self, node, first, stem, out_str, mode):
         # node - the node to add (and its descendents)
         # first - true if this is the first child of its parent (so don't add the stem)
-        # stem - 
+        # stem -
         name = node.name if len(node.name)==1 else '*'
 
         if mode is None:
@@ -175,7 +178,7 @@ class Dungeon():
 
     def count_doors_keys_and_depth(self, node):
         # Find out the number of keys below this node, the number of
-        # doors beneath this node, and the maximum distance to the 
+        # doors beneath this node, and the maximum distance to the
         # lowest key (i.e. the farthest leaf) below this node.
         total_doors = 0
         total_keys = 0
@@ -187,7 +190,7 @@ class Dungeon():
 
             total_keys += child.keys_below
             if isinstance(child, TreeKey): total_keys += 1
-            
+
             if child.max_depth_below + child.cost > max_depth:
                 max_depth = child.max_depth_below + child.cost
 
@@ -285,7 +288,7 @@ class Dungeon():
             self.del_node(node_to_remove)
         else:
             # This node is a dead end.  We need to replace rather than remove it (we
-            # don't want to leave a key, and we dont' want to cut out a node that 
+            # don't want to leave a key, and we dont' want to cut out a node that
             # pacman is currently sitting on)
             self.replace_node(node_to_remove)
 
@@ -316,14 +319,35 @@ class Dungeon():
     def find_tree_node(self, name):
         return self.name_to_tree_node.get(name, None)
 
+    def go_to_node(self, dest_node):
+        # Travel from current location to the specified node.
+        # Pick up all keys traversed en route, and keep track of distance travelled.
+        route_up, route_down = self.pacman_location.find_route(dest_node)
+
+        for node in route_up[:-1]:
+            self.pacman_distance += node.cost
+            if isinstance(node, TreeKey):
+                self.pick_up_key(node)
+
+        for node in route_down[1:]:
+            self.pacman_distance += node.cost
+            if isinstance(node, TreeKey):
+                self.pick_up_key(node)
+
+        self.pacman_location = dest_node
+
     def pick_up_key(self, key_node):
+        if key_node in self.keys_collected:
+            # Don't double-open doors, or the costs will get out of whack
+            return
+
         # open the door, and add the key to our list of collected keys
         if door := self.find_tree_node(key_node.door_name()):
             door.remove()
 
         self.keys_collected.add(key_node)
 
-    def visible_tree_nodes(self, from_node=None, acc=None):
+    def visible_tree_nodes(self, from_node=None, acc=None, stop_at_keys=False):
         # 'visible' means not hidden behind a door
         # Because it's a tree, and we start at the root, from wherever we are we can see the same as the root can see.
         if from_node is None: from_node = self.tree
@@ -332,13 +356,15 @@ class Dungeon():
         acc.append(from_node)
 
         for child in from_node.children:
-            if not isinstance(child, TreeDoor):
-                self.visible_tree_nodes(child, acc)
+            if stop_at_keys and isinstance(child, TreeKey):
+                acc.append(child)
+            elif not isinstance(child, TreeDoor):
+                self.visible_tree_nodes(child, acc, stop_at_keys=stop_at_keys)
 
         return acc
 
-    def visible_tree_keys(self):
-        return [node for node in self.visible_tree_nodes() if (isinstance(node, TreeKey) and node not in self.keys_collected)]
+    def visible_tree_keys(self, stop_at_keys=False):
+        return [node for node in self.visible_tree_nodes(stop_at_keys=stop_at_keys) if (isinstance(node, TreeKey) and node not in self.keys_collected)]
 
     def visible_doors(self, from_node):
         # Return a list of door-nodes visible from this node.
@@ -349,7 +375,7 @@ class Dungeon():
         # Return a list of key-nodes visible from this node.
         # 'Visible' means not hidden behind a door.
         return [node for node in self.visible_nodes(from_node, stop_on_keys=stop_on_keys) if isinstance(node, Key)]
-    
+
     def visible_nodes(self, from_node, used_edges=None, visited_nodes=None, stop_on_keys=False):
         # Return a list of all nodes visible from this node.
         # 'Visible' means not hidden behind a door.
@@ -491,6 +517,12 @@ class TreeNode():
         self.children = children if children else []
         if self.parent: self.parent.add_child(self)
 
+    def __str__ (self):
+        return str(self.__class__) + "-<" + self.name + ">"
+
+    def __repr__ (self):
+        return self.__str__()
+
     def add_child(self, child):
         self.children.append(child)
 
@@ -512,10 +544,17 @@ class TreeNode():
         try:
             self.parent.children.remove(self)
         except ValueError:
-            import traceback
-            traceback.print_stack()
-            print(traceback.format_exc())
-            import pdb; pdb.set_trace()
+            # Slight hack: during pruning, we may have taken a dead-end door
+            # out of the tree.  In that case, we still know about the door (we
+            # currently don't remove it from the nodes dict), but it's no
+            # longer connected to anything.  That's OK - just carry on.
+            if isinstance(self, TreeDoor):
+                pass
+            else:
+                import traceback
+                traceback.print_stack()
+                print(traceback.format_exc())
+                import pdb; pdb.set_trace()
 
     def consolidate(self, predicate):
         # Join together boring nodes below here - nodes that aren't doors, keys, or junctions
@@ -566,6 +605,52 @@ class TreeNode():
 
         return acc
 
+    def _ancestors(self):
+        # Returns a list of nodes from this up to the root
+        # Could calculate at start-of-day but would need to handle removal
+        if not self.parent: return []
+
+        ancestor = self
+        ancestors = []
+        while next_ancestor := ancestor.parent:
+            ancestors.append(next_ancestor)
+            ancestor = next_ancestor
+
+        return ancestors
+
+    def find_route(self, other_node):
+        # Finds the unique route from this to the other node.
+        # Returns two lists - the route up the tree, and the route back down again.
+        # If the other node is above this one in the tree, those lists will be:
+        # [this, ..., other], []
+        # If the other node is below this one in the tree, the lists will be:
+        # [], [this, ..., other]
+        # If the nodes are in different branches of the tree, the lists will be:
+        # [this, ..., common_parent], [common_parent, ..., other]
+        my_ancestors = self._ancestors()
+
+        if other_node in my_ancestors:
+            # Just need to go up
+            end = my_ancestors.index(other_node)
+            return [self] + my_ancestors[:end+1], []
+
+        thy_ancestors = other_node._ancestors()
+
+        if self in thy_ancestors:
+            # Just need to go down
+            end = thy_ancestors.index(self)
+            return [], ([other_node] + thy_ancestors[:end+1])[::-1] # Reverse order
+
+        # We have a common ancestor.
+        for node in my_ancestors:
+            if node in thy_ancestors:
+                common = node
+                break
+
+        route_up = [self] + my_ancestors[: my_ancestors.index(common)+1]
+        route_down = ([other_node] + thy_ancestors[: thy_ancestors.index(common)+1])[::-1]
+        return route_up, route_down
+
 
 class TreeDoor(TreeNode):
     def __init__(self, *args, **kwargs):
@@ -593,28 +678,32 @@ def create_dungeon(mapp):
 
 def solve_tree_dungeon(dungeon, starting_order=""):
     distance_travelled = 0
-    path = "@"
+    key_path = "@"
     choices = 1
     current = dungeon.find_tree_node('@')
+    #import pdb; pdb.set_trace()
 
-    while keys_available := dungeon.visible_tree_keys():
+    while keys_available := dungeon.visible_tree_keys(): #stop_at_keys=True):
         choices *= len(keys_available)
         # next_key = keys_available[0]  # Arbitrary
         next_key = random.choice(keys_available)
 
-        path += next_key.name
-        distance_travelled += current.distance(next_key)
-        dungeon.pick_up_key(next_key)
+        key_path += next_key.name
+        #distance_travelled += current.distance(next_key)
+        #dungeon.pick_up_key(next_key)
+        dungeon.go_to_node(next_key)  # travel from here to there, and pick up all keys on the way
+
         # next_key.remove()  # Replaced by just keeping track of collected keys (prevents destroying the map we're looking at)
         # TODO : consider doing similar for doors (and update visible_X() methods to skip over opened doors)
 
         current = next_key
-        # print (distance_travelled, current.name, path); sys.stdout.flush()
+        #print (dungeon.pacman_distance, current.name, key_path); sys.stdout.flush()
 
     # print(choices)
-    # print(path)
+    # print(key_path)
     # print(distance_travelled)
-    return distance_travelled, path, choices
+    #return distance_travelled, key_path, choices
+    return dungeon.pacman_distance, key_path, choices
 
 def solve_the_dungeon(dungeon, quiet=False):
     # Returns best_distance, path, choices
@@ -622,7 +711,7 @@ def solve_the_dungeon(dungeon, quiet=False):
     remaining_keys = set(dungeon.keys)
     distance_travelled = 0
     choices = 1
-    path="@"
+    key_path="@"
 
     # Would be good to modify this to not affect the underlying graph - then it would be faster to do repeats
     try:
@@ -634,7 +723,7 @@ def solve_the_dungeon(dungeon, quiet=False):
 
             # Pick up a key, then 'open' the relevant door - i.e. remove that door node.
             next_key = random.choice(visible_keys)
-            path += next_key.name
+            key_path += next_key.name
             distance_travelled += dungeon.minimum_distance(pacman_is_at, next_key)
             pacman_is_at = next_key
             newly_opened_door = dungeon.find_node(next_key.door_name())
@@ -651,7 +740,7 @@ def solve_the_dungeon(dungeon, quiet=False):
         raise
 
     if not quiet: print("Had {} choices; picked a route of length {}".format(choices, distance_travelled))
-    return distance_travelled, path, choices
+    return distance_travelled, key_path, choices
 
 
 def solve_dungeon(mapp, solver, quiet=True, repeats=1):
@@ -663,13 +752,13 @@ def solve_dungeon(mapp, solver, quiet=True, repeats=1):
     for repeat in range(repeats):
         # test_dungeon = copy.deepcopy(dungeon)  # Slower than create_dungeon()
         dungeon = create_dungeon(mapp)
-        distance, path, choices = solver(dungeon) # TODO, quiet=quiet)
+        distance, key_path, choices = solver(dungeon) # TODO, quiet=quiet)
 
         if lowest_distance is None or distance < lowest_distance:
             lowest_distance = distance
-            best_path = path
+            best_path = key_path
 
-    print(lowest_distance, path, choices)
+    if True or  not quiet: print(lowest_distance, key_path, choices)
     return lowest_distance
 
 def show_tree(mapp):
@@ -716,7 +805,7 @@ example_4 = """#################
 #l.F..d...h..C.m#
 #################"""
 print(solve_dungeon(example_4, solve_tree_dungeon, repeats=1000), "vs", 136)
-# show_tree(example_4)
+show_tree(example_4)
 
 # Best is 81
 example_5 = """########################
@@ -830,47 +919,12 @@ dungeon.show_tree(mode="keys")
 dungeon.show_tree(mode="cost")
 dungeon.show_tree()
 
-# Continue here : hitting a ValueError in node.remove() for some reason (door 'F')
-# F is in a dead-end after 'h'
-# -@-*-C-m-k
-#    |-*-*-c
-#    | | |-K-*-b
-#    | | |    -n-s-o-X-v-J-*-u
-#    | | |                  -Q-p-f
-#    | |  -*-Y-x
-#    | |    -g-t-I-E-V-*-U-q-P-z-h
-#    | |                -j
-#    |  -l-M-D-a-R-S-O-y
-#     -d-r-w-G-T-i-e
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
 
-#   File "day18.py", line 834, in <module>
-#     print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-#   File "day18.py", line 666, in solve_dungeon
-#     distance, path, choices = solver(dungeon) # TODO, quiet=quiet)
-#   File "day18.py", line 607, in solve_tree_dungeon
-#     dungeon.pick_up_key(next_key)
-#   File "day18.py", line 322, in pick_up_key
-#     door.remove()
-#   File "day18.py", line 516, in remove
-#     traceback.print_stack()
-# Traceback (most recent call last):
-#   File "day18.py", line 513, in remove
-#     self.parent.children.remove(self)
-# ValueError: list.remove(x): x not in list
+import timeit
 
-# --Return--
-# > c:\users\sam\documents\code\aoc2019\day18.py(518)remove()->None
-# -> import pdb; pdb.set_trace()
-# (Pdb) self.name
-# 'F'
-# (Pdb) self.parent.name
-# 'h'
-# (Pdb) [x.name for x in self.parent.children]
-# []
-# (Pdb)
-
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+print(timeit.timeit("solve_dungeon(puzzle, solve_tree_dungeon, repeats=100)", number=3, globals=globals()))
