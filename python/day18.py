@@ -676,28 +676,43 @@ class TreeKey(TreeNode):
 def create_dungeon(mapp):
     return Dungeon(mapp)
 
-def solve_tree_dungeon(dungeon, starting_order=""):
+def solve_tree_dungeon(dungeon, starting_order="", debug=False):
     distance_travelled = 0
     key_path = "@"
     choices = 1
     current = dungeon.find_tree_node('@')
     #import pdb; pdb.set_trace()
 
+    # TODO: for some reason following this exact path gives a higher number
+    # (6976) than when random choice found this path (6328).  So something is
+    # borked with the calcs ... somewhere.
+    preferred_order = [c for c in starting_order]
+
     while keys_available := dungeon.visible_tree_keys(): #stop_at_keys=True):
         choices *= len(keys_available)
+
+        # Choose where to go next
         # next_key = keys_available[0]  # Arbitrary
-        next_key = random.choice(keys_available)
+
+        # Try the preferred order first
+        available_key_names = [k.name for k in keys_available]
+        next_key = None
+
+        for preferred in preferred_order:
+            if preferred in available_key_names:
+                next_key = dungeon.name_to_tree_node[preferred]
+                available_key_names.remove(preferred)
+                break
+
+        if next_key is None:
+            next_key = random.choice(keys_available)  # default choice method
 
         key_path += next_key.name
-        #distance_travelled += current.distance(next_key)
-        #dungeon.pick_up_key(next_key)
         dungeon.go_to_node(next_key)  # travel from here to there, and pick up all keys on the way
 
-        # next_key.remove()  # Replaced by just keeping track of collected keys (prevents destroying the map we're looking at)
-        # TODO : consider doing similar for doors (and update visible_X() methods to skip over opened doors)
-
         current = next_key
-        #print (dungeon.pacman_distance, current.name, key_path); sys.stdout.flush()
+        if debug:
+            print (dungeon.pacman_distance, current.name, key_path); sys.stdout.flush()
 
     # print(choices)
     # print(key_path)
@@ -743,7 +758,7 @@ def solve_the_dungeon(dungeon, quiet=False):
     return distance_travelled, key_path, choices
 
 
-def solve_dungeon(mapp, solver, quiet=True, repeats=1):
+def solve_dungeon(mapp, solver, quiet=True, repeats=1, *args, **kwargs):
     # dungeon = create_dungeon(mapp)
     # solve_tree_dungeon(dungeon)
 
@@ -752,7 +767,7 @@ def solve_dungeon(mapp, solver, quiet=True, repeats=1):
     for repeat in range(repeats):
         # test_dungeon = copy.deepcopy(dungeon)  # Slower than create_dungeon()
         dungeon = create_dungeon(mapp)
-        distance, key_path, choices = solver(dungeon) # TODO, quiet=quiet)
+        distance, key_path, choices = solver(dungeon, args, kwargs) # TODO, quiet=quiet)
 
         if lowest_distance is None or distance < lowest_distance:
             lowest_distance = distance
@@ -804,8 +819,10 @@ example_4 = """#################
 ########.########
 #l.F..d...h..C.m#
 #################"""
-print(solve_dungeon(example_4, solve_tree_dungeon, repeats=1000), "vs", 136)
-show_tree(example_4)
+# Example 4 is quite slow
+if False:
+    print(solve_dungeon(example_4, solve_tree_dungeon, repeats=1000), "vs", 136)
+    show_tree(example_4)
 
 # Best is 81
 example_5 = """########################
@@ -919,12 +936,19 @@ dungeon.show_tree(mode="keys")
 dungeon.show_tree(mode="cost")
 dungeon.show_tree()
 
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
-print(solve_dungeon(puzzle, solve_tree_dungeon, repeats=10))
+all_lowest = []
+
+solve_tree_dungeon(dungeon, starting_order="wlgtcekobayxvjuqfh", debug=True)
+
+exit()
+
+for _ in range(5):
+    all_lowest.append(solve_dungeon(puzzle, solve_tree_dungeon, repeats=100))
+
+print()
+
+print( min(all_lowest) )
 
 import timeit
 
-print(timeit.timeit("solve_dungeon(puzzle, solve_tree_dungeon, repeats=100)", number=3, globals=globals()))
+#print(timeit.timeit("solve_dungeon(puzzle, solve_tree_dungeon, repeats=100)", number=1, globals=globals()))            ; sys.stdout.flush()
