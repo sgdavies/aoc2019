@@ -1,6 +1,49 @@
-struct ProgramState {
+struct Computer {
     ip: usize, // instruction pointer
     memory: Vec<i32>,
+}
+
+impl Computer {
+    fn create_computer(program: Vec<i32>) -> Computer {
+        Computer {
+            ip : 0,
+            memory : program,
+        }
+    }
+
+    fn execute(&mut self) {
+        loop {
+            // execute instruction
+            let opcode = *&self.memory[self.ip];
+            match opcode {
+                1 => { // add
+                    let a = self.value_at(*&self.memory[self.ip+1] as usize);
+                    let b = self.value_at(*&self.memory[self.ip+2] as usize);
+                    let store_loc = *&self.memory[self.ip+3] as usize;
+                    let val = a + b;
+                    self.memory[store_loc] = val;
+                    self.ip += 4;
+                },
+
+                2 => { // multiply
+                    let a = self.value_at(*&self.memory[self.ip+1] as usize);
+                    let b = self.value_at(*&self.memory[self.ip+2] as usize);
+                    let store_loc = *&self.memory[self.ip+3] as usize;
+                    let val = a * b;
+                    self.memory[store_loc] = val;
+                    self.ip += 4;
+                },
+
+                99 => break, // exit
+
+                _ => panic!("Unknown opcode {} at ip {} of program {:?}", opcode, self.ip, self.memory),
+            };
+        };
+    }
+
+    fn value_at(&self, location: usize) -> i32 {
+        self.memory[location]
+    }
 }
 
 fn main() {
@@ -28,54 +71,13 @@ fn run_with_noun_and_verb(program: &Vec<i32>, noun: i32, verb: i32) -> i32 {
     let mut test_program = program.clone();
     test_program[1] = noun;
     test_program[2] = verb;
-    let state = run_program(test_program);
-    state.memory[0]
-}
-
-fn run_program(program: Vec<i32>) -> ProgramState {
-    let mut state = ProgramState {
-        ip : 0,
-        memory : program,
-    };
-
-    loop {
-        // execute instruction
-        let opcode = *&state.memory[state.ip];
-        match opcode {
-            1 => { // add
-                let a = value_at(&state.memory, *&state.memory[state.ip+1] as usize);
-                let b = value_at(&state.memory, *&state.memory[state.ip+2] as usize);
-                let store_loc = *&state.memory[state.ip+3] as usize;
-                let val = a + b;
-                state.memory[store_loc] = val;
-                state.ip += 4;
-            },
-
-            2 => { // multiply
-                let a = value_at(&state.memory, *&state.memory[state.ip+1] as usize);
-                let b = value_at(&state.memory, *&state.memory[state.ip+2] as usize);
-                let store_loc = *&state.memory[state.ip+3] as usize;
-                let val = a * b;
-                state.memory[store_loc] = val;
-                state.ip += 4;
-            },
-
-            99 => break, // exit
-
-            _ => panic!("Unknown opcode {} at ip {} of program {:?}", opcode, state.ip, state.memory),
-        };
-    };
-
-    state
-}
-
-fn value_at(memory: &Vec<i32>, location: usize) -> i32 {
-    memory[location]
+    let mut computer = Computer::create_computer(test_program);
+    computer.execute();
+    computer.value_at(0)
 }
 
 fn run_tests() {
     run_test(vec![99,0,1,2,3], vec![99,0,1,2,3]);
-    // run_test(vec![1,2,3,0,99], vec![1,2,3,0,99]);
 
     run_test(vec![1,0,0,0,99], vec![2,0,0,0,99]);
     run_test(vec![2,3,0,3,99], vec![2,3,0,6,99]);
@@ -87,7 +89,8 @@ fn run_tests() {
 }
 
 fn run_test(input: Vec<i32>, answer: Vec<i32>) {
-    let final_state = run_program(input);
+    let mut computer = Computer::create_computer(input);
+    computer.execute();
     // assert!(output == answer, "Test failed: expected {:?} but got {:?} (input {:?})", answer, output, &input);
-    assert!(final_state.memory == answer, "Test failed: expected {:?} but got {:?}", answer, final_state.memory);
+    assert!(computer.memory == answer, "Test failed: expected {:?} but got {:?}", answer, computer.memory);
 }
