@@ -27,7 +27,18 @@ fn run_program(program: Vec<i32>) -> ProgramState {
                 state.memory[store_loc] = val;
                 state.ip += 4;
             },
+
+            2 => { // multiply
+                let a = value_at(&state.memory, *&state.memory[state.ip+1] as usize);
+                let b = value_at(&state.memory, *&state.memory[state.ip+2] as usize);
+                let store_loc = *&state.memory[state.ip+3] as usize;
+                let val = a * b;
+                state.memory[store_loc] = val;
+                state.ip += 4;
+            },
+
             99 => break, // exit
+
             _ => panic!("Unknown opcode {} at ip {} of program {:?}", opcode, state.ip, state.memory),
         };
     };
