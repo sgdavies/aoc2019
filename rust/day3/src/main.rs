@@ -17,11 +17,11 @@ struct Point {
 }
 
 impl Point {
-    fn manhatten_distance_from_other(&self, other: &Point) -> i32 {
-        (self.x - other.x).abs() + (self.y - other.y).abs()
+    fn manhatten_distance_from_other(&self, other: &Point) -> u32 {
+        ((self.x - other.x).abs() + (self.y - other.y).abs()) as u32
     }
 
-    fn manhatten_distance(&self) -> i32 {
+    fn manhatten_distance(&self) -> u32 {
         self.manhatten_distance_from_other(&Point{x:0, y:0,})
     }
 }
@@ -49,17 +49,20 @@ impl Wire {
         Wire{ segments: vec, id, }
     }
 
-    fn trace_path(&self, circuit_board: &mut HashMap<Point,u32>) {
+    fn trace_path(&self, circuit_board: &mut HashMap<Point,(u32, u32)>) {
         // Don't insert the origin
         let mut location = Point { x: 0, y: 0, };
+        let mut travelled: u32 = 0;
 
         for segment in &self.segments {
-            self.trace_segment(&segment, &mut location, circuit_board);
+            self.trace_segment(&segment, &mut location, circuit_board, &mut travelled);
         }
     }
 
-    fn trace_segment(&self, segment: &SegmentDefinition, location: &mut Point, circuit_board: &mut HashMap<Point,u32>) {
+    fn trace_segment(&self, segment: &SegmentDefinition, location: &mut Point, circuit_board: &mut HashMap<Point,(u32,u32)>, travelled: &mut u32) {
         for _ in 0..segment.distance {
+            *travelled += 1;
+
             match segment.direction {
                 Direction::U => location.y += 1,
                 Direction::D => location.y -= 1,
@@ -67,8 +70,12 @@ impl Wire {
                 Direction::R => location.x -= 1,
             }
 
-            let visited = circuit_board.entry(location.clone()).or_insert(1);
-            *visited *= self.id;
+            let visited = circuit_board.entry(location.clone()).or_insert((1,0));  // (id multiplier, step count)
+            if visited.0 % self.id != 0 {
+                // We've not been here before - add the step count
+                visited.1 += *travelled;
+            }
+            visited.0 *= self.id;
         }
     }
 }
@@ -80,43 +87,58 @@ fn main() {
     let wire_two = "L1002,D658,L695,U170,L117,U93,R700,D960,L631,U483,L640,D699,R865,U886,L59,D795,R265,U803,R705,D580,R519,U685,R126,D888,R498,U934,L980,U734,L91,D50,R805,U197,R730,U363,R337,U594,L666,U702,L237,D140,L72,U980,L167,U598,L726,U497,L340,D477,L304,U945,R956,U113,L43,D4,R890,D316,R916,D644,R704,D398,L905,U361,R420,U31,L317,U338,R703,D211,R27,D477,L746,U813,R705,U191,L504,D434,R697,D945,R835,D374,L512,U269,L299,U448,R715,U363,R266,U720,L611,U672,L509,D983,L21,U895,L340,D794,R528,U603,R154,D610,L582,U420,L696,U599,R16,U610,L134,D533,R156,D338,L761,U49,L335,D238,R146,U97,L997,U545,L896,D855,L653,D789,R516,D371,L99,D731,R868,D182,R535,D35,R190,D618,R10,D694,L567,D17,R356,U820,R671,D883,R807,U218,L738,U225,L145,D954,R588,U505,R108,U178,R993,D788,R302,D951,R697,D576,L324,U930,R248,D245,R622,U323,R667,U876,L987,D411,L989,U915,R157,D67,L968,U61,R274,D189,L53,D133,R617,D958,L379,U563,L448,D412,R940,U12,R885,U121,R746,U215,R420,U346,L469,D839,R964,D273,R265,D3,L714,D224,L177,U194,L573,U511,L795,U299,L311,U923,R815,U594,L654,U326,L547,U547,R467,D937,L174,U453,R635,D551,L365,U355,R658,U996,R458,D623,R61,U181,R340,U163,L329,D496,L787,D335,L37,D565,R318,U942,R198,U85,R328,D826,R817,D118,R138,D29,L434,D427,R222,D866,L10,D152,R822,D779,L900,D307,R723,D363,L715,D60,R661,U680,R782,U789,R311,D36,R425,U498,L910,D546,R394,D52,R803,D168,L6,U769,R856,D999,L786,U695,R568,U236,R472,U291,L530,U314,L251,D598,R648,D475,L132,D236,L915,D695,L700,U378,L685,D240,R924,D977,R627,U824,L165";
 
     // Part one
-    let dist = get_distance(wire_one, wire_two);
+    let (dist, steps) = get_distance(wire_one, wire_two);
     println!("Part one distance: {}", dist);
+    println!("Part two steps: {}", steps);
 }
 
-fn get_distance(wire_one: &str, wire_two: &str) -> i32 {
+fn get_distance(wire_one: &str, wire_two: &str) -> (u32, u32) {
     const ID_ONE: u32 = 2;
     const ID_TWO: u32 = 3;
     let wire_one = Wire::from_string(wire_one, ID_ONE);
     let wire_two = Wire::from_string(wire_two, ID_TWO);
 
-    let mut circuit_board: HashMap<Point,u32> = HashMap::new();
+    let mut circuit_board: HashMap<Point,(u32,u32)> = HashMap::new();
 
     wire_one.trace_path(&mut circuit_board);
     wire_two.trace_path(&mut circuit_board);
 
-    let ans: i32 = match circuit_board.iter()
-        .filter(|&(_, v)| *v % (ID_ONE*ID_TWO) == 0)
+    let crossings: Vec<(&Point, u32)> = circuit_board.iter()
+        .filter(|&(_, (ids, _))| *ids % (ID_ONE*ID_TWO) == 0)
+        .map(|(k, (_, steps))| (k, *steps))
+        .collect();
+
+    let part_one_answer = match crossings.iter()
         .map(|(k, _)| k.manhatten_distance())
-        .collect::<Vec<i32>>()
+        .collect::<Vec<u32>>()
         .iter()
         .min() {
             Some(&x) => x,
             None => panic!("Wires never crossed"),
         };
 
-    ans
+    let part_two_answer = match crossings.iter()
+        .map(|(_, v)| *v)
+        .collect::<Vec<u32>>()
+        .iter()
+        .min() {
+            Some(&x) => x,
+            None => panic!("Wires never crossed"),
+        };
+
+    (part_one_answer, part_two_answer)
 }
 
 fn run_tests() {
-    run_test("R8,U5,L5,D3", "U7,R6,D4,L4", 6);
-    run_test("R75,D30,R83,U83,L12,D49,R71,U7,L72", "U62,R66,U55,R34,D71,R55,D58,R83", 159);
-    run_test("R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51", "U98,R91,D20,R16,D67,R40,U7,R15,U6,R7", 135);
+    run_test("R8,U5,L5,D3", "U7,R6,D4,L4", 6, 30);
+    run_test("R75,D30,R83,U83,L12,D49,R71,U7,L72", "U62,R66,U55,R34,D71,R55,D58,R83", 159, 610);
+    run_test("R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51", "U98,R91,D20,R16,D67,R40,U7,R15,U6,R7", 135, 410);
 
     println!("All tests pass!");
 }
 
-fn run_test(wire_one: &str, wire_two: &str, answer: i32) {
-    let distance = get_distance(wire_one, wire_two);
-    assert_eq!(distance, answer, "Failed: {} != {} for wires {} and {}", distance, answer, wire_one, wire_two);
+fn run_test(wire_one: &str, wire_two: &str, ans1: u32, ans2: u32) {
+    let (man, steps) = get_distance(wire_one, wire_two);
+    assert_eq!(man, ans1, "Failed part one: {} != {} for wires {} and {}", man, ans1, wire_one, wire_two);
+    assert_eq!(steps, ans2, "Failed part one: {} != {} for wires {} and {}", steps, ans2, wire_one, wire_two);
 }
