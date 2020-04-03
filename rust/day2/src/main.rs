@@ -1,50 +1,5 @@
-struct Computer {
-    ip: usize, // instruction pointer
-    memory: Vec<i32>,
-}
-
-impl Computer {
-    fn create_computer(program: Vec<i32>) -> Computer {
-        Computer {
-            ip : 0,
-            memory : program,
-        }
-    }
-
-    fn execute(&mut self) {
-        loop {
-            // execute instruction
-            let opcode = *&self.memory[self.ip];
-            match opcode {
-                1 => { // add
-                    let a = self.value_at(*&self.memory[self.ip+1] as usize);
-                    let b = self.value_at(*&self.memory[self.ip+2] as usize);
-                    let store_loc = *&self.memory[self.ip+3] as usize;
-                    let val = a + b;
-                    self.memory[store_loc] = val;
-                    self.ip += 4;
-                },
-
-                2 => { // multiply
-                    let a = self.value_at(*&self.memory[self.ip+1] as usize);
-                    let b = self.value_at(*&self.memory[self.ip+2] as usize);
-                    let store_loc = *&self.memory[self.ip+3] as usize;
-                    let val = a * b;
-                    self.memory[store_loc] = val;
-                    self.ip += 4;
-                },
-
-                99 => break, // exit
-
-                _ => panic!("Unknown opcode {} at ip {} of program {:?}", opcode, self.ip, self.memory),
-            };
-        };
-    }
-
-    fn value_at(&self, location: usize) -> i32 {
-        self.memory[location]
-    }
-}
+mod computer;
+pub use crate::computer::computer::Computer;//
 
 fn main() {
     run_tests();
@@ -92,5 +47,9 @@ fn run_test(input: Vec<i32>, answer: Vec<i32>) {
     let mut computer = Computer::create_computer(input);
     computer.execute();
     // assert!(output == answer, "Test failed: expected {:?} but got {:?} (input {:?})", answer, output, &input);
-    assert!(computer.memory == answer, "Test failed: expected {:?} but got {:?}", answer, computer.memory);
+    let mut memory: Vec<i32> = Vec::new();
+    for x in &answer {
+        memory.push(*x);
+    }
+    assert!(memory == answer, "Test failed: expected {:?} but got {:?}", answer, memory);
 }
