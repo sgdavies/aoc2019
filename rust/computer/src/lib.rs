@@ -18,8 +18,7 @@ pub mod computer {
     
         pub fn execute(&mut self) {
             loop {
-                // debug info...
-                // println!("ip {}, instruction {:?}", &self.ip, &self.memory[self.ip..std::cmp::min(self.memory.len(), self.ip+10)]);
+                // println!("ip {}, instruction {:?}", &self.ip, &self.memory[self.ip..std::cmp::min(self.memory.len(), self.ip+10)]); // Debug only
                 // execute instruction
                 let instruction = Instruction::new(&self.memory[self.ip]);
                 match instruction.opcode {
@@ -72,7 +71,7 @@ pub mod computer {
                             Mode::Position => self.memory[self.ip+1] as usize,
                         };
                         let val = self.memory[addr];
-                        println!("Output: {}", &val);
+                        // println!("Output: {}", &val); // Debug only
                         self.outputs.push(val);
                         self.ip += 2;
                     }
@@ -94,6 +93,13 @@ pub mod computer {
 
         pub fn get_next_output(&mut self) -> i32 {
             self.outputs.remove(0)
+        }
+
+        pub fn get_last_output(&mut self) -> i32 {
+            match self.outputs.pop() {
+                Some(val) => val,
+                None => panic!("No output to givE")
+            }
         }
     }
 
