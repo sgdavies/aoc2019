@@ -1,5 +1,4 @@
-mod computer;
-pub use crate::computer::computer::Computer;//
+pub use computer::computer::Computer;
 
 fn main() {
     run_tests();
