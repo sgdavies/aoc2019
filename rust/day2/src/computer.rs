@@ -18,6 +18,8 @@ pub mod computer {
     
         pub fn execute(&mut self) {
             loop {
+                // debug info...
+                // println!("ip {}, instruction {:?}", &self.ip, &self.memory[self.ip..std::cmp::min(self.memory.len(), self.ip+10)]);
                 // execute instruction
                 let instruction = Instruction::new(&self.memory[self.ip]);
                 match instruction.opcode {
@@ -39,8 +41,16 @@ pub mod computer {
                     },
     
                     2 => { // multiply
-                        let a = self.value_at(*&self.memory[self.ip+1] as usize);
-                        let b = self.value_at(*&self.memory[self.ip+2] as usize);
+                        let a_addr = match instruction.modes[0] {
+                            Mode::Immediate => self.ip+1, // immediate mode
+                            Mode::Position => self.memory[self.ip+1] as usize,
+                        };
+                        let b_addr = match instruction.modes[1] {
+                            Mode::Immediate => self.ip+2, // immediate mode
+                            Mode::Position => self.memory[self.ip+2] as usize,
+                        };
+                        let a = self.value_at(a_addr);
+                        let b = self.value_at(b_addr);
                         let store_loc = *&self.memory[self.ip+3] as usize;
                         let val = a * b;
                         self.memory[store_loc] = val;
@@ -57,7 +67,11 @@ pub mod computer {
                     },
 
                     4 => { // append output
-                        let val = self.memory[self.ip+1];
+                        let addr = match instruction.modes[0] {
+                            Mode::Immediate => self.ip+1, // immediate mode
+                            Mode::Position => self.memory[self.ip+1] as usize,
+                        };
+                        let val = self.memory[addr];
                         println!("Output: {}", &val);
                         self.outputs.push(val);
                         self.ip += 2;
@@ -101,6 +115,7 @@ pub mod computer {
                 1 => 3,
                 2 => 3,
                 3 => 1,
+                4 => 1,
                 _ => 0,
             };
             Instruction { modes: Instruction::get_modes(modes, n_modes), opcode: opcode, }
