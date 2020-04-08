@@ -22,7 +22,7 @@ pub mod computer {
                 // execute instruction
                 let instruction = Instruction::new(&self.memory[self.ip]);
                 match instruction.opcode {
-                    1 => { // add
+                    Opcode::Add => {
                         let a_addr = match instruction.modes[0] {
                             Mode::Immediate => self.ip+1, // immediate mode
                             Mode::Position => self.memory[self.ip+1] as usize,
@@ -39,7 +39,7 @@ pub mod computer {
                         self.ip += 4;
                     },
     
-                    2 => { // multiply
+                    Opcode::Multiply => {
                         let a_addr = match instruction.modes[0] {
                             Mode::Immediate => self.ip+1, // immediate mode
                             Mode::Position => self.memory[self.ip+1] as usize,
@@ -56,7 +56,7 @@ pub mod computer {
                         self.ip += 4;
                     },
 
-                    3 => { // read input
+                    Opcode::Input => {
                         let addr = match instruction.modes[0] {
                             Mode::Immediate => self.ip+1, // immediate mode
                             Mode::Position => self.memory[self.ip+1] as usize,
@@ -65,7 +65,7 @@ pub mod computer {
                         self.ip += 2;
                     },
 
-                    4 => { // append output
+                    Opcode::Output => {
                         let addr = match instruction.modes[0] {
                             Mode::Immediate => self.ip+1, // immediate mode
                             Mode::Position => self.memory[self.ip+1] as usize,
@@ -74,11 +74,22 @@ pub mod computer {
                         // println!("Output: {}", &val); // Debug only
                         self.outputs.push(val);
                         self.ip += 2;
-                    }
+                    },
+
+                    Opcode::JumpIfTrue => {
+                        panic!("Not implmented");
+                    },
+                    Opcode::JumpIfFalse => {
+                        panic!("Not implmented");
+                    },
+                    Opcode::LessThan => {
+                        panic!("Not implmented");
+                    },
+                    Opcode::Equal => {
+                        panic!("Not implmented");
+                    },
     
-                    99 => break, // exit
-    
-                    _ => panic!("Unknown opcode {} at ip {} of program {:?}", instruction.opcode, self.ip, self.memory),
+                    Opcode::Exit => break,
                 };
             };
         }
@@ -109,20 +120,50 @@ pub mod computer {
         Position,
     }
 
+    #[derive(Debug)]
+    enum Opcode {
+        Add,
+        Multiply,
+        Input,
+        Output,
+        JumpIfTrue,
+        JumpIfFalse,
+        LessThan,
+        Equal,
+        Exit,
+    }
+
     struct Instruction {
-        opcode: i32,
+        opcode: Opcode,
         modes: Vec<Mode>,
     }
 
     impl Instruction {
         fn new(instruction: &i32) -> Instruction {
             let (modes, opcode) = (instruction/100, instruction%100);
+            let opcode = match opcode {
+                1 => Opcode::Add,
+                2 => Opcode::Multiply,
+                3 => Opcode::Input,
+                4 => Opcode::Output,
+                5 => Opcode::JumpIfTrue,
+                6 => Opcode::JumpIfFalse,
+                7 => Opcode::LessThan,
+                8 => Opcode::Equal,
+                99 => Opcode::Exit,
+                _ => panic!("Unkonwn opcode: {}", opcode),
+            };
+
             let n_modes = match opcode {
-                1 => 3,
-                2 => 3,
-                3 => 1,
-                4 => 1,
-                _ => 0,
+                Opcode::Add => 3,
+                Opcode::Multiply => 3,
+                Opcode::Input => 1,
+                Opcode::Output => 1,
+                Opcode::JumpIfTrue => 2,
+                Opcode::JumpIfFalse => 2,
+                Opcode::LessThan => 3,
+                Opcode::Equal => 3,
+                Opcode::Exit => 0,
             };
             Instruction { modes: Instruction::get_modes(modes, n_modes), opcode: opcode, }
         }
@@ -144,8 +185,71 @@ pub mod computer {
 
 #[cfg(test)]
 mod tests {
+    use crate::computer::Computer;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn day2_tests() {
+        test_final_memory(vec![99,0,1,2,3], vec![99,0,1,2,3]);
+    
+        test_final_memory(vec![1,0,0,0,99], vec![2,0,0,0,99]);
+        test_final_memory(vec![2,3,0,3,99], vec![2,3,0,6,99]);
+        test_final_memory(vec![2,4,4,5,99,0], vec![2,4,4,5,99,9801]);
+        test_final_memory(vec![1,1,1,4,99,5,6,0,99], vec![30,1,1,4,2,5,6,0,99]);
+        test_final_memory(vec![1,9,10,3,2,3,11,0,99,30,40,50], vec![3500,9,10,70,2,3,11,0,99,30,40,50]);
+    }
+
+    #[test]
+    fn day5_part_one_tests() {
+        test_final_memory(vec![1101,100,-1,4,0], vec![1101,100,-1,4,99]);
+    }
+    #[test]
+    fn day5_part_two_tests() {
+        test_output_for_input(vec![3,9,8,9,10,9,4,9,99,-1,8], 7, 0); // equal to 8->1 (position mode)
+        test_output_for_input(vec![3,9,8,9,10,9,4,9,99,-1,8], 8, 1); // equal to 8->1 (position mode)
+
+        test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], -1, 1); // less than 8->1 (position mode)
+        test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 0, 1); // less than 8->1 (position mode)
+        test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 7, 1); // less than 8->1 (position mode)
+        test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 8, 0); // less than 8->1 (position mode)
+        test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 9, 0); // less than 8->1 (position mode)
+
+        test_output_for_input(vec![3,3,1108,-1,8,3,4,3,99], -8, 0); // equal to 8 (immediate mode)
+        test_output_for_input(vec![3,3,1108,-1,8,3,4,3,99], 8, 1); // equal to 8 (immediate mode)
+
+        test_output_for_input(vec![3,3,1107,-1,8,3,4,3,99], -8, 1); // less than 8 (immediate mode)
+        test_output_for_input(vec![3,3,1107,-1,8,3,4,3,99], 8, 0); // less than 8 (immediate mode)
+        test_output_for_input(vec![3,3,1107,-1,8,3,4,3,99], 9, 0); // less than 8 (immediate mode)
+
+        test_output_for_input(vec![3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9], 0, 0); // Jump - output 0 if input is 0 (position mode)
+        test_output_for_input(vec![3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9], -999, 1); // Jump - output 0 if input is 0 (position mode)
+        
+        test_output_for_input(vec![3,3,1105,-1,9,1101,0,0,12,4,12,99,1], 0, 0); // Jump - output 0 if input is 0 (immediate mode)
+        test_output_for_input(vec![3,3,1105,-1,9,1101,0,0,12,4,12,99,1], 999, 1); // Jump - output 0 if input is 0 (immediate mode)
+
+        test_output_for_input(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
+             7, 999); // 999 for <8, 1000 for 8, 1001 for > 8
+        test_output_for_input(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
+            8, 1000); // 999 for <8, 1000 for 8, 1001 for > 8
+        test_output_for_input(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
+            8, 1001); // 999 for <8, 1000 for 8, 1001 for > 8
+    }
+    
+    fn test_final_memory(input: Vec<i32>, answer: Vec<i32>) {
+        let mut computer = Computer::create_computer(input);
+        computer.execute();
+        // assert!(output == answer, "Test failed: expected {:?} but got {:?} (input {:?})", answer, output, &input);
+        let mut memory: Vec<i32> = Vec::new();
+        for x in &answer {
+            memory.push(*x);
+        }
+        assert!(memory == answer, "Test failed: expected {:?} but got {:?}", answer, memory);
+    }
+
+    fn test_output_for_input(program: Vec<i32>, input: i32, output: i32) {
+        let mut computer = Computer::create_computer(program);
+        computer.add_input(input);
+        computer.execute();
+        let result = computer.get_last_output();
+        assert!(result == output, "Expected {}, got {}", output, result);
     }
 }
