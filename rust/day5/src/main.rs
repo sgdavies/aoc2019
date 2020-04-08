@@ -15,5 +15,5 @@ fn main() {
     computer.add_input(5);
     computer.execute();
 
-    println!("Last output value: {}", computer.get_last_output()); // 
+    println!("Last output value: {}", computer.get_last_output()); // 8805067
 }

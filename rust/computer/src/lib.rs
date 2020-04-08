@@ -19,78 +19,9 @@ pub mod computer {
         pub fn execute(&mut self) {
             loop {
                 // println!("ip {}, instruction {:?}", &self.ip, &self.memory[self.ip..std::cmp::min(self.memory.len(), self.ip+10)]); // Debug only
-                // execute instruction
-                let instruction = Instruction::new(&self.memory[self.ip]);
-                match instruction.opcode {
-                    Opcode::Add => {
-                        let a_addr = match instruction.modes[0] {
-                            Mode::Immediate => self.ip+1, // immediate mode
-                            Mode::Position => self.memory[self.ip+1] as usize,
-                        };
-                        let b_addr = match instruction.modes[1] {
-                            Mode::Immediate => self.ip+2, // immediate mode
-                            Mode::Position => self.memory[self.ip+2] as usize,
-                        };
-                        let a = self.value_at(a_addr);
-                        let b = self.value_at(b_addr);
-                        let store_loc = *&self.memory[self.ip+3] as usize;
-                        let val = a + b;
-                        self.memory[store_loc] = val;
-                        self.ip += 4;
-                    },
-    
-                    Opcode::Multiply => {
-                        let a_addr = match instruction.modes[0] {
-                            Mode::Immediate => self.ip+1, // immediate mode
-                            Mode::Position => self.memory[self.ip+1] as usize,
-                        };
-                        let b_addr = match instruction.modes[1] {
-                            Mode::Immediate => self.ip+2, // immediate mode
-                            Mode::Position => self.memory[self.ip+2] as usize,
-                        };
-                        let a = self.value_at(a_addr);
-                        let b = self.value_at(b_addr);
-                        let store_loc = *&self.memory[self.ip+3] as usize;
-                        let val = a * b;
-                        self.memory[store_loc] = val;
-                        self.ip += 4;
-                    },
-
-                    Opcode::Input => {
-                        let addr = match instruction.modes[0] {
-                            Mode::Immediate => self.ip+1, // immediate mode
-                            Mode::Position => self.memory[self.ip+1] as usize,
-                        };
-                        self.memory[addr] = self.inputs.remove(0);
-                        self.ip += 2;
-                    },
-
-                    Opcode::Output => {
-                        let addr = match instruction.modes[0] {
-                            Mode::Immediate => self.ip+1, // immediate mode
-                            Mode::Position => self.memory[self.ip+1] as usize,
-                        };
-                        let val = self.memory[addr];
-                        // println!("Output: {}", &val); // Debug only
-                        self.outputs.push(val);
-                        self.ip += 2;
-                    },
-
-                    Opcode::JumpIfTrue => {
-                        panic!("Not implmented");
-                    },
-                    Opcode::JumpIfFalse => {
-                        panic!("Not implmented");
-                    },
-                    Opcode::LessThan => {
-                        panic!("Not implmented");
-                    },
-                    Opcode::Equal => {
-                        panic!("Not implmented");
-                    },
-    
-                    Opcode::Exit => break,
-                };
+                let (exit, _output) = Instruction::new(&self.memory[self.ip]).execute(self);
+                
+                if exit { break; }
             };
         }
     
@@ -180,6 +111,89 @@ pub mod computer {
             }
             v
         }
+
+        fn execute(&self, computer: &mut Computer) -> (bool, bool) {
+            match self.opcode {
+                Opcode::Add => {
+                    self.combine(computer, |a,b| a+b)
+                },
+
+                Opcode::Multiply => {
+                    self.combine(computer, |a,b| a*b)
+                },
+
+                Opcode::Input => {
+                    let addr = self.get_addr_for_param(0, computer);
+                    computer.memory[addr] = computer.inputs.remove(0);
+                    computer.ip += 2;
+                    (false, false)
+                },
+
+                Opcode::Output => {
+                    let addr = self.get_addr_for_param(0, computer);
+                    let val = computer.memory[addr];
+                    // println!("Output: {}", &val); // Debug only
+                    computer.outputs.push(val);
+                    computer.ip += 2;
+                    (false, true)
+                },
+
+                Opcode::JumpIfTrue => {
+                    self.jump_if(computer, |a| a!=0)
+                },
+
+                Opcode::JumpIfFalse => {
+                    self.jump_if(computer, |a| a==0)
+                },
+
+                Opcode::LessThan => {
+                    self.compare(computer, |a,b| a<b)
+                },
+
+                Opcode::Equal => {
+                    self.compare(computer, |a,b| a==b)
+                },
+
+                Opcode::Exit => (true, false),
+            }
+        }
+
+        fn get_addr_for_param(&self, param: usize, computer: &Computer) -> usize {
+            match self.modes[param] {
+                Mode::Immediate => computer.ip+1+param, // immediate mode
+                Mode::Position => computer.memory[computer.ip+1+param] as usize,
+            }
+        }
+
+        fn combine(&self, computer: &mut Computer, f: impl Fn(i32, i32) -> i32) -> (bool, bool) {
+            let a = computer.value_at(self.get_addr_for_param(0, computer));
+            let b = computer.value_at(self.get_addr_for_param(1, computer));
+            let store_loc = *&computer.memory[computer.ip+3] as usize;
+            let val = f(a, b);
+            computer.memory[store_loc] = val;
+            computer.ip += 4;
+
+            (false, false)
+        }
+
+        fn compare(&self, computer: &mut Computer, f: impl Fn(i32, i32) -> bool) -> (bool, bool) {
+            let a = computer.value_at(self.get_addr_for_param(0, computer));
+            let b = computer.value_at(self.get_addr_for_param(1, computer));
+            let store_loc = *&computer.memory[computer.ip+3] as usize;
+            
+            computer.memory[store_loc] = match f(a, b) { true => 1, false => 0, };
+            computer.ip += 4;
+
+            (false, false)
+        }
+
+        fn jump_if(&self, computer: &mut Computer, f: impl Fn(i32) -> bool) -> (bool, bool) {
+            let test_val = computer.value_at(self.get_addr_for_param(0, computer));
+            let jump_loc = computer.value_at(self.get_addr_for_param(1, computer));
+
+            computer.ip = match f(test_val) { true => jump_loc as usize, false => computer.ip+3, };
+            (false, false)
+        }
     }
 }
 
@@ -201,20 +215,25 @@ mod tests {
     #[test]
     fn day5_part_one_tests() {
         test_final_memory(vec![1101,100,-1,4,0], vec![1101,100,-1,4,99]);
+
+        // Assorted input/output tests
+        test_output_for_input(vec![3, 5, 4, 5, 99, -99], 0, 0); // output the input
+        test_output_for_input(vec![3, 5, 4, 5, 99, -99], -11, -11); // output the input
+        test_output_for_input(vec![3, 9, 101, 7, 9, 9, 4, 9, 99, -99], 0, 7); // output the input+7
     }
     #[test]
     fn day5_part_two_tests() {
         test_output_for_input(vec![3,9,8,9,10,9,4,9,99,-1,8], 7, 0); // equal to 8->1 (position mode)
         test_output_for_input(vec![3,9,8,9,10,9,4,9,99,-1,8], 8, 1); // equal to 8->1 (position mode)
 
+        test_output_for_input(vec![3,3,1108,-1,8,3,4,3,99], -8, 0); // equal to 8 (immediate mode)
+        test_output_for_input(vec![3,3,1108,-1,8,3,4,3,99], 8, 1); // equal to 8 (immediate mode)
+
         test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], -1, 1); // less than 8->1 (position mode)
         test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 0, 1); // less than 8->1 (position mode)
         test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 7, 1); // less than 8->1 (position mode)
         test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 8, 0); // less than 8->1 (position mode)
         test_output_for_input(vec![3,9,7,9,10,9,4,9,99,-1,8], 9, 0); // less than 8->1 (position mode)
-
-        test_output_for_input(vec![3,3,1108,-1,8,3,4,3,99], -8, 0); // equal to 8 (immediate mode)
-        test_output_for_input(vec![3,3,1108,-1,8,3,4,3,99], 8, 1); // equal to 8 (immediate mode)
 
         test_output_for_input(vec![3,3,1107,-1,8,3,4,3,99], -8, 1); // less than 8 (immediate mode)
         test_output_for_input(vec![3,3,1107,-1,8,3,4,3,99], 8, 0); // less than 8 (immediate mode)
@@ -227,11 +246,11 @@ mod tests {
         test_output_for_input(vec![3,3,1105,-1,9,1101,0,0,12,4,12,99,1], 999, 1); // Jump - output 0 if input is 0 (immediate mode)
 
         test_output_for_input(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
-             7, 999); // 999 for <8, 1000 for 8, 1001 for > 8
+            7, 999); // 999 for <8, 1000 for 8, 1001 for > 8
         test_output_for_input(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
             8, 1000); // 999 for <8, 1000 for 8, 1001 for > 8
         test_output_for_input(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
-            8, 1001); // 999 for <8, 1000 for 8, 1001 for > 8
+            9, 1001); // 999 for <8, 1000 for 8, 1001 for > 8
     }
     
     fn test_final_memory(input: Vec<i32>, answer: Vec<i32>) {
