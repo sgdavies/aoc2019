@@ -1,20 +1,14 @@
 use std::collections::HashMap;
+use std::fs;
 
 fn main() {
-    let example = "COM)B
-B)C
-C)D
-D)E
-E)F
-B)G
-G)H
-D)I
-E)J
-J)K
-K)L";
-    let example = count_orbits(example);
+    let example_input = fs::read_to_string("example.txt").expect("Failed to read example file");
+    let example = count_orbits(&example_input);
     let expected = 42;
     assert_eq!(example, expected, "Example: {} vs {}", example, expected);
+
+    let puzzle_input = fs::read_to_string("puzzle.txt").expect("Failed to read puzzle input");
+    println!("Part one answer: {}", count_orbits(&puzzle_input)); // 119831
 }
 
 fn count_orbits(input: &str) -> u32 {
@@ -38,7 +32,7 @@ fn count_from(orbits: &HashMap<&str, Vec<&str>>, parent: &str, depth: u32) -> u3
                 total += count_from(&orbits, child, depth+1);
             }
         },
-        None => (),
+        None => (), // This is a leaf planet (no children)
     }
     
     total
