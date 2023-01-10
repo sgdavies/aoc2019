@@ -29,13 +29,13 @@ def count_range (start_str, end_str, debug=False):
               if a==a0 and b==b0 and c==c0 and d==d0 and e<e0:
                   continue
               for f in range(10):
-                  if cmp([a,b,c,d,e,f],[ax,bx,cx,dx,ex,fx]) > 0:
-                      print counter
+                  if [a,b,c,d,e,f]>[ax,bx,cx,dx,ex,fx]:
+                      print(counter)
                       return counter
 
                   if a==a0 and b==b0 and c==c0 and d==d0 and e==e0 and f<f0:
                       continue
-                  if debug: print a,b,c,d,e,f,"==",verify(a,b,c,d,e,f)
+                  if debug: print(a,b,c,d,e,f,"==",verify(a,b,c,d,e,f))
 
                   if verify(a,b,c,d,e,f):
                       #print "Got one:",a,b,c,d,e,f
@@ -54,8 +54,8 @@ def tests ():
     assert(count_range("123450", "123460", debug=True) == 1)
     assert(count_range("123400", "123500") == 10)
 
-    print "All tests pass"
+    print("All tests pass")
 
 tests()
 
-print count_range("165432","707912")
+print(count_range("367479","893698"))

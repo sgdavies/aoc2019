@@ -1,5 +1,5 @@
 def fuel (mass):
-    return max((mass/3) -2, 0)
+    return max((mass//3) -2, 0)
 
 assert(fuel(12) == 2)
 assert(fuel(14) == 2)
@@ -21,10 +21,10 @@ assert(fuel_with_fuel(14) == 2)
 assert(fuel_with_fuel(1969) == 966)
 assert(fuel_with_fuel(100756) == 50346)
 
-with open("aoc2019\\day1.input", "r") as f:
-    fuel_for_modules = sum([fuel_with_fuel(int(x)) for x in f.readlines()])
+with open("day1.input", "r") as f:
+    inputs = [int(x) for x in f.readlines()]
+    fuel_one = sum([fuel(x) for x in inputs])
+    fuel_for_modules = sum([fuel_with_fuel(x) for x in inputs])
 
-
+print(fuel_one)
 print(fuel_for_modules)
-#print(fuel_with_fuel(fuel_for_modules))
-

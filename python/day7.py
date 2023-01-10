@@ -3,8 +3,8 @@ DEBUG=False
 def massert (cond, *args):
     # My assert - print args and exit if condition is false
     if not cond:
-        print "\nAssertion!"
-        print "\n".join([str(arg) for arg in args])
+        print("\nAssertion!")
+        print("\n".join([str(arg) for arg in args]))
         assert(False)
 
 class Instruction:
@@ -12,9 +12,9 @@ class Instruction:
     def get_instruction (instruction):
         # Factory
         opcode = instruction %100
-        modes = instruction / 100
+        modes = instruction // 100
 
-        if DEBUG: print instruction, opcode, modes,
+        if DEBUG: print(instruction, opcode, modes)
 
         return { 1 : AddInstr,
                  2 : MultInstr,
@@ -31,7 +31,7 @@ class Instruction:
 
         self._params = None
 
-        if DEBUG: print self.__class__.__name__
+        if DEBUG: print(self.__class__.__name__)
 
     def get_params (self, program):
         if self._params is None:
@@ -66,7 +66,7 @@ class Instruction:
         modesarr = []
         while self.modes > 0:
             modesarr.append(self.modes % 10)
-            self.modes /= 10
+            self.modes //= 10
 
         self.modes = modesarr
 
@@ -98,9 +98,9 @@ class AddInstr(CombineTwoInstr):
         try:
             return a+b
         except TypeError:
-            print a
-            print b
-            print self
+            print(a)
+            print(b)
+            print(self)
             raise
 
 class MultInstr(CombineTwoInstr):
@@ -146,7 +146,7 @@ class JumpIfInstr(Instruction):
         else:
             next_ip = program.ip +3  # Opcode, test val, next ip val
 
-        if DEBUG: print self.__class__.__name__, test_val, ip_val, "->", next_ip
+        if DEBUG: print(self.__class__.__name__, test_val, ip_val, "->", next_ip)
         return next_ip, True
 
     def _get_params (self, program):
@@ -218,7 +218,7 @@ class Program:
     def append_to_output (self, val):
         # Output
         self.output_buffer.append(val)
-        if DEBUG: print "Output updated:\t", " ".join([str(o) for o in self.output_buffer])
+        if DEBUG: print("Output updated:\t", " ".join([str(o) for o in self.output_buffer]))
         self.new_output = True
 
     def store (self, val, loc):
@@ -227,17 +227,17 @@ class Program:
             exit(1)
 
         self.memory[loc] = val
-        if DEBUG: print "Update ({}->{}):\t".format(loc,val), self.memory
+        if DEBUG: print("Update ({}->{}):\t".format(loc,val), self.memory)
 
     def get (self, ix):
         return self.memory[ix]
 
     def run(self):
-        if DEBUG: print "Starting prog:\t", self.memory,"\n  with inputs:\t", self.inputs
+        if DEBUG: print("Starting prog:\t", self.memory,"\n  with inputs:\t", self.inputs)
         carry_on = True
         try:
             while carry_on:
-                if DEBUG: print "ip:",self.ip,"\t",
+                if DEBUG: print("ip:",self.ip,"\t")
                 this_instr = self.get(self.ip)
                 instr = Instruction.get_instruction(this_instr)
                 self.ip, carry_on = instr.execute(self)
@@ -247,21 +247,21 @@ class Program:
                     output = self.output_buffer[0]
                     self.output_buffer = []
                     self.new_output = False
-                    if DEBUG: print "Interim output:", output
+                    if DEBUG: print("Interim output:", output)
                     return output
         except:
             raise
         finally:
             if self.output_buffer:
-                if DEBUG: print "Output:", self.output_buffer
+                if DEBUG: print("Output:", self.output_buffer)
 
         return self.output_buffer
 
     def display(self, debug=False):
-        print self.memory
+        print(self.memory)
         if debug:
-            print self.ip
-            print
+            print(self.ip)
+            print()
 
 def test (program, inputs=None, output=None, expected_mem=None, expected_mem_len=None):
     p = Program(program, inputs=inputs)
@@ -275,7 +275,7 @@ def test (program, inputs=None, output=None, expected_mem=None, expected_mem_len
             expected_mem_len = len(expected_mem)
 
         if not (p.memory[:expected_mem_len] == expected_mem):
-            print "Vals not equal:\n\t", p.memory[:expected_mem_len],"\n\t", expected_mem
+            print("Vals not equal:\n\t", p.memory[:expected_mem_len],"\n\t", expected_mem)
             assert(False)
 
 def test_day2 ():
@@ -367,11 +367,11 @@ def find_largest_output (limits, program, fun):
     aas = range(limits[0], limits[1])
 
     for aa in aas:
-        if DEBUG: print "\n", aa,
+        if DEBUG: print("\n", aa)
         bs = list(aas)
         bs.pop(bs.index(aa))
         for bb in bs:
-            if DEBUG: print ".", ;sys.stdout.flush()
+            if DEBUG: print(".") ;sys.stdout.flush()
             cs = list(bs)
             cs.pop(cs.index(bb))
             for cc in cs:
@@ -388,7 +388,7 @@ def find_largest_output (limits, program, fun):
                             biggest_output = output
                             best_order = [aa,bb,cc,dd,ee]
 
-    if DEBUG: print
+    if DEBUG: print()
     return biggest_output, best_order
 
 def day7part1fun(program, aa,bb,cc,dd,ee):
@@ -459,13 +459,14 @@ def day7part2fun(program, aa,bb,cc,dd,ee):
             finalE=outE
 
 
-DAY_7_PROGRAM = [3,8,1001,8,10,8,105,1,0,0,21,34,55,68,93,106,187,268,349,430,99999,3,9,102,5,9,9,1001,9,2,9,4,9,99,3,9,1001,9,5,9,102,2,9,9,101,2,9,9,102,2,9,9,4,9,99,3,9,101,2,9,9,102,4,9,9,4,9,99,3,9,101,4,9,9,102,3,9,9,1001,9,2,9,102,4,9,9,1001,9,2,9,4,9,99,3,9,101,2,9,9,1002,9,5,9,4,9,99,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,99,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,2,9,9,4,9,99,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,99,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,99]
+#DAY_7_PROGRAM = [3,8,1001,8,10,8,105,1,0,0,21,34,55,68,93,106,187,268,349,430,99999,3,9,102,5,9,9,1001,9,2,9,4,9,99,3,9,1001,9,5,9,102,2,9,9,101,2,9,9,102,2,9,9,4,9,99,3,9,101,2,9,9,102,4,9,9,4,9,99,3,9,101,4,9,9,102,3,9,9,1001,9,2,9,102,4,9,9,1001,9,2,9,4,9,99,3,9,101,2,9,9,1002,9,5,9,4,9,99,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,99,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,2,9,9,4,9,99,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,99,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,99]
+DAY_7_PROGRAM = [3,8,1001,8,10,8,105,1,0,0,21,38,55,72,93,118,199,280,361,442,99999,3,9,1001,9,2,9,1002,9,5,9,101,4,9,9,4,9,99,3,9,1002,9,3,9,1001,9,5,9,1002,9,4,9,4,9,99,3,9,101,4,9,9,1002,9,3,9,1001,9,4,9,4,9,99,3,9,1002,9,4,9,1001,9,4,9,102,5,9,9,1001,9,4,9,4,9,99,3,9,101,3,9,9,1002,9,3,9,1001,9,3,9,102,5,9,9,101,4,9,9,4,9,99,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,99,3,9,1001,9,1,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,99,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,99,3,9,1001,9,1,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,102,2,9,9,4,9,99,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,99]
 def test_day7():
     assert(43210 == find_largest_output((0,5), [3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0], day7part1fun)[0])
     assert(54321 == find_largest_output((0,5), [3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0], day7part1fun)[0])
     assert(65210 == find_largest_output((0,5), [3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0], day7part1fun)[0])
 
-    assert(34852 == find_largest_output((0,5), DAY_7_PROGRAM, day7part1fun)[0])
+    #assert(34852 == find_largest_output((0,5), DAY_7_PROGRAM, day7part1fun)[0])
 
 def tests ():
     test_day2()
@@ -480,10 +481,11 @@ def tests ():
 tests()
 
 DEBUG=False
-print find_largest_output((5,10), [3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5], day7part2fun)
+print(find_largest_output((5,10), [3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5], day7part2fun))
 sys.stdout.flush()
-print find_largest_output((5,10), [3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10], day7part2fun)
+print(find_largest_output((5,10), [3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10], day7part2fun))
 sys.stdout.flush()
-print find_largest_output((5,10), DAY_7_PROGRAM, day7part2fun)
+print(find_largest_output((0,5), DAY_7_PROGRAM, day7part1fun))
+print(find_largest_output((5,10), DAY_7_PROGRAM, day7part2fun))
 sys.stdout.flush()
 

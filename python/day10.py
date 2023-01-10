@@ -81,13 +81,13 @@ class AsteroidMap:
         # flipped (y at the top) so actually this comes out as clockwise after all
         ordered_asteroids = [(k,order_dict[k]) for k in sorted(order_dict.keys())]
 
-        if DEBUG: print "before switching:",ordered_asteroids
+        if DEBUG: print("before switching:",ordered_asteroids)
         # Move to back until the first one is straight up (or clockwise from that)
         # Remember up is negative (y=0 at the top)
         while ordered_asteroids[0][0] < -cmath.pi/2:
             ordered_asteroids.append(ordered_asteroids.pop(0))
 
-        if DEBUG: print "after switching:",ordered_asteroids
+        if DEBUG: print("after switching:",ordered_asteroids)
         return [elem[1] for elem in ordered_asteroids]
 
 
@@ -142,7 +142,7 @@ class AsteroidMap:
         px = x if x>0 else -x
         py = y if y>0 else -y
         gd = gcd(px,py)
-        return (x/gd, y/gd)
+        return (x//gd, y//gd)
 
     def best_location (self):
         if self._best_location is None:
@@ -162,16 +162,16 @@ def find_Nth_vaporized (the_map, asteroid, N):
     asteroid_map = AsteroidMap(the_map)
 
     if DEBUG:
-        print asteroid_map.the_map
-        print asteroid_map.display()
+        print(asteroid_map.the_map)
+        print(asteroid_map.display())
     assert(asteroid in asteroid_map.the_map)
 
     while len(vaporized) < N:
         visibles = asteroid_map.get_visibles(asteroid)
-        if DEBUG: print "Visible:", visibles
+        if DEBUG: print("Visible:", visibles)
         assert(asteroid not in visibles)
         visibles = asteroid_map.order_asteroids(asteroid, visibles)
-        if DEBUG: print "Ordered:", visibles
+        if DEBUG: print("Ordered:", visibles)
 
         for target in visibles:
             #if DEBUG: print target
@@ -291,34 +291,41 @@ def tests ():
     assert(map_4.best_location() == (11,13))
     assert(map_4.best_value() == 210)
 
-    input_data="""##.##..#.####...#.#.####
-##.###..##.#######..##..
-..######.###.#.##.######
-.#######.####.##.#.###.#
-..#...##.#.....#####..##
-#..###.#...#..###.#..#..
-###..#.##.####.#..##..##
-.##.##....###.#..#....#.
-########..#####..#######
-##..#..##.#..##.#.#.#..#
-##.#.##.######.#####....
-###.##...#.##...#.######
-###...##.####..##..#####
-##.#...#.#.....######.##
-.#...####..####.##...##.
-#.#########..###..#.####
-#.##..###.#.######.#####
-##..##.##...####.#...##.
-###...###.##.####.#.##..
-####.#.....###..#.####.#
-##.####..##.#.##..##.#.#
-#####..#...####..##..#.#
-.##.##.##...###.##...###
-..###.########.#.###..#."""
+    input_data="""#...##.####.#.......#.##..##.#.
+#.##.#..#..#...##..##.##.#.....
+#..#####.#......#..#....#.###.#
+...#.#.#...#..#.....#..#..#.#..
+.#.....##..#...#..#.#...##.....
+##.....#..........##..#......##
+.##..##.#.#....##..##.......#..
+#.##.##....###..#...##...##....
+##.#.#............##..#...##..#
+###..##.###.....#.##...####....
+...##..#...##...##..#.#..#...#.
+..#.#.##.#.#.#####.#....####.#.
+#......###.##....#...#...#...##
+.....#...#.#.#.#....#...#......
+#..#.#.#..#....#..#...#..#..##.
+#.....#..##.....#...###..#..#.#
+.....####.#..#...##..#..#..#..#
+..#.....#.#........#.#.##..####
+.#.....##..#.##.....#...###....
+###.###....#..#..#.....#####...
+#..##.##..##.#.#....#.#......#.
+.#....#.##..#.#.#.......##.....
+##.##...#...#....###.#....#....
+.....#.######.#.#..#..#.#.....#
+.#..#.##.#....#.##..#.#...##..#
+.##.###..#..#..#.###...#####.#.
+#...#...........#.....#.......#
+#....##.#.#..##...#..####...#..
+#.####......#####.....#.##..#..
+.#...#....#...##..##.#.#......#
+#..###.....##.#.......#.##...##"""
 
     asteroids = AsteroidMap(input_data)
-    assert(asteroids.best_location() == (14,17))
-    assert(asteroids.best_value() == 260)
+    print(asteroids.best_location()) # == (14,17))
+    print(asteroids.best_value()) # == 260)
 
     # Part 2
     test_map = """.#.
@@ -338,8 +345,8 @@ def tests ():
     # Larger example
     assert(find_Nth_vaporized(map_4_str, (11,13), 200) == (8,2))
 
-    x,y = find_Nth_vaporized(input_data, (14,17), 200)
-    assert(100*x + y == 608)
+    x,y = find_Nth_vaporized(input_data, (17,22), 200) #17,22 from part one
+    print(100*x + y) # == 608)
 
     print("All tests passed")
 
