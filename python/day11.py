@@ -3,8 +3,8 @@ DEBUG=False
 def massert (cond, *args):
     # My assert - print args and exit if condition is false
     if not cond:
-        print "\nAssertion!"
-        print "\n".join([str(arg) for arg in args])
+        print("\nAssertion!")
+        print("\n".join([str(arg) for arg in args]))
         assert(False)
 
 class Instruction:
@@ -12,9 +12,9 @@ class Instruction:
     def get_instruction (instruction):
         # Factory
         opcode = instruction %100
-        modes = instruction / 100
+        modes = instruction // 100
 
-        if DEBUG: print "{} ({} | {})".format(instruction, opcode, modes),
+        if DEBUG: print("{} ({} | {})".format(instruction, opcode, modes))
 
         return { 1 : AddInstr,
                  2 : MultInstr,
@@ -32,7 +32,7 @@ class Instruction:
 
         self._params = None
 
-        if DEBUG: print self.__class__.__name__
+        if DEBUG: print(self.__class__.__name__)
 
     def get_params (self, program):
         if self._params is None:
@@ -63,7 +63,7 @@ class Instruction:
             # relative base mode
             return program.get(program.relative_base + param)
         else:
-            print "Unknown mode:", m
+            print("Unknown mode:", m)
             assert(False)
 
     def execute (self, program):
@@ -75,7 +75,7 @@ class Instruction:
         modesarr = []
         while self.modes > 0:
             modesarr.append(self.modes % 10)
-            self.modes /= 10
+            self.modes //= 10
 
         self.modes = modesarr
 
@@ -110,9 +110,9 @@ class AddInstr(CombineTwoInstr):
         try:
             return a+b
         except TypeError:
-            print a
-            print b
-            print self
+            print(a)
+            print(b)
+            print(self)
             raise
 
 class MultInstr(CombineTwoInstr):
@@ -127,7 +127,7 @@ class InputInstr(Instruction):
 
         val = program.inputs.pop(0)
 
-        if DEBUG: print "mode:", mode, " val:", val
+        if DEBUG: print("mode:", mode, " val:", val)
 
         if mode == 0 or mode == 1:
             # Store the val at the address stored in the param
@@ -135,7 +135,7 @@ class InputInstr(Instruction):
         elif mode == 2:
             loc = program.get(program.ip +1) + program.relative_base
         else:
-            print "unknown input mode:", mode
+            print("unknown input mode:", mode)
             assert(False)
 
         program.store(val,loc)
@@ -170,7 +170,7 @@ class JumpIfInstr(Instruction):
         else:
             next_ip = program.ip +3  # Opcode, test val, next ip val
 
-        if DEBUG: print self.__class__.__name__, test_val, ip_val, "->", next_ip
+        if DEBUG: print(self.__class__.__name__, test_val, ip_val, "->", next_ip)
         return next_ip, True
 
     def _get_params (self, program):
@@ -226,7 +226,7 @@ class EqInstr(CompareInstr):
 class RelBaseInstr(Instruction):
     def execute (self, program):
         program.relative_base += self.get_params(program)[0]
-        if DEBUG: print "Relbase is now", program.relative_base
+        if DEBUG: print("Relbase is now", program.relative_base)
         return program.ip+2, True
 
     def _get_params (self, program):
@@ -257,14 +257,14 @@ class Program:
     def append_to_output (self, val):
         # Output
         self.output_buffer.append(val)
-        if DEBUG: print "Output updated:\t", " ".join([str(o) for o in self.output_buffer])
+        if DEBUG: print("Output updated:\t", " ".join([str(o) for o in self.output_buffer]))
         self.new_output = True
 
     def store (self, val, loc):
         self._check_or_extend_memory(loc)
 
         self.memory[loc] = val
-        if DEBUG: print "Update ({}->{}):\t".format(loc,val), self.memory
+        if DEBUG: print("Update ({}->{}):\t".format(loc,val))#, self.memory)
 
     def get (self, ix):
         self._check_or_extend_memory(ix)
@@ -275,11 +275,11 @@ class Program:
             self.memory.append(0)
 
     def run(self):
-        if DEBUG: print "Starting prog:\t", self.memory,"\n  with inputs:\t", self.inputs
+        if DEBUG: print("Starting prog:\t", '---' if True else self.memory,"\n  with inputs:\t", self.inputs)
         carry_on = True
         try:
             while carry_on:
-                if DEBUG: print "ip:",self.ip,"\t",
+                if DEBUG: print("ip:",self.ip,"\t")
                 this_instr = self.get(self.ip)
                 instr = Instruction.get_instruction(this_instr)
                 self.ip, carry_on = instr.execute(self)
@@ -289,13 +289,13 @@ class Program:
                     output = self.output_buffer[0]
                     self.output_buffer = []
                     self.new_output = False
-                    if DEBUG: print "Interim output:", output
+                    if DEBUG: print("Interim output:", output)
                     return output, False
         except:
             raise
         finally:
             if self.output_buffer:
-                if DEBUG: print "Output:", self.output_buffer
+                if DEBUG: print("Output:", self.output_buffer)
 
         if self.pause_on_output:
             if self.new_output:
@@ -307,10 +307,10 @@ class Program:
             return self.output_buffer
 
     def display(self, debug=False):
-        print self.memory
+        print(self.memory)
         if debug:
-            print self.ip
-            print
+            print(self.ip)
+            print()
 
 def test (program, inputs=None, output=None, expected_mem=None, expected_mem_len=None):
     p = Program(program, inputs=inputs)
@@ -324,7 +324,7 @@ def test (program, inputs=None, output=None, expected_mem=None, expected_mem_len
             expected_mem_len = len(expected_mem)
 
         if not (p.memory[:expected_mem_len] == expected_mem):
-            print "Vals not equal:\n\t", p.memory[:expected_mem_len],"\n\t", expected_mem
+            print("Vals not equal:\n\t", p.memory[:expected_mem_len],"\n\t", expected_mem)
             assert(False)
 
 def test_day2 ():
@@ -416,11 +416,11 @@ def find_largest_output (limits, program, fun):
     aas = range(limits[0], limits[1])
 
     for aa in aas:
-        if DEBUG: print "\n", aa,
+        if DEBUG: print("\n", aa)
         bs = list(aas)
         bs.pop(bs.index(aa))
         for bb in bs:
-            if DEBUG: print ".", ;sys.stdout.flush()
+            if DEBUG: print(".") ;sys.stdout.flush()
             cs = list(bs)
             cs.pop(cs.index(bb))
             for cc in cs:
@@ -437,7 +437,7 @@ def find_largest_output (limits, program, fun):
                             biggest_output = output
                             best_order = [aa,bb,cc,dd,ee]
 
-    if DEBUG: print
+    if DEBUG: print()
     return biggest_output, best_order
 
 def day7part1fun(program, aa,bb,cc,dd,ee):
@@ -534,8 +534,8 @@ def test_day_9():
     out = Program([1102,34915192,34915192,7,4,7,99,0]).run()
     assert(len(out) == 1)
     out = out[0]
-    assert(out / 10**(16-1) > 0)
-    assert(out / 10**(17-1) == 0)
+    assert(out // 10**(16-1) > 0)
+    assert(out // 10**(17-1) == 0)
 
     # Middle number - 1125899906842624
     assert(Program([104,1125899906842624,99]).run()[0] == 1125899906842624)
@@ -557,17 +557,13 @@ def tests ():
     test_day7()
 
     # Very slow test (6 seconds)
-    #SKIP#test_day_9()
+    #SKIP SLOW #test_day_9()
 
     print("All tests passed")
 
 tests()
 
-drawing_program = [3,8,1005,8,299,1106,0,11,0,0,0,104,1,104,0,3,8,102,-1,8,10,101,1,10,10,4,10,108,1,8,10,4,10,102,1,8,28,1006,0,85,1,106,14,10,3,8,102,-1,8,10,1001,10,1,10,4,10,1008,8,0,10,4,10,101,0,8,58,1,1109,15,10,3,8,1002,8,-1,10,1001,10,1,10,4,10,1008,8,0,10,4,10,1002,8,1,84,3,8,102,-1,8,10,1001,10,1,10,4,10,108,1,8,10,4,10,1002,8,1,105,1006,0,48,3,8,1002,8,-1,10,1001,10,1,10,4,10,108,0,8,10,4,10,102,1,8,130,1006,0,46,1,1001,17,10,3,8,1002,8,-1,10,101,1,10,10,4,10,1008,8,0,10,4,10,1002,8,1,160,2,109,20,10,3,8,102,-1,8,10,1001,10,1,10,4,10,108,0,8,10,4,10,1002,8,1,185,3,8,102,-1,8,10,1001,10,1,10,4,10,108,1,8,10,4,10,1001,8,0,207,1006,0,89,2,1002,6,10,1,1007,0,10,3,8,102,-1,8,10,101,1,10,10,4,10,1008,8,1,10,4,10,101,0,8,241,2,4,14,10,3,8,102,-1,8,10,101,1,10,10,4,10,1008,8,1,10,4,10,101,0,8,267,1,1107,8,10,1,109,16,10,2,1107,4,10,101,1,9,9,1007,9,1003,10,1005,10,15,99,109,621,104,0,104,1,21101,0,387239486208,1,21102,316,1,0,1106,0,420,21101,0,936994976664,1,21102,327,1,0,1105,1,420,3,10,104,0,104,1,3,10,104,0,104,0,3,10,104,0,104,1,3,10,104,0,104,1,3,10,104,0,104,0,3,10,104,0,104,1,21102,1,29192457307,1,21102,1,374,0,1106,0,420,21101,0,3450965211,1,21101,0,385,0,1106,0,420,3,10,104,0,104,0,3,10,104,0,104,0,21102,1,837901103972,1,21101,408,0,0,1106,0,420,21102,867965752164,1,1,21101,0,419,0,1105,1,420,99,109,2,22102,1,-1,1,21102,40,1,2,21102,451,1,3,21102,1,441,0,1106,0,484,109,-2,2106,0,0,0,1,0,0,1,109,2,3,10,204,-1,1001,446,447,462,4,0,1001,446,1,446,108,4,446,10,1006,10,478,1102,0,1,446,109,-2,2105,1,0,0,109,4,1201,-1,0,483,1207,-3,0,10,1006,10,501,21101,0,0,-3,22101,0,-3,1,22102,1,-2,2,21101,1,0,3,21101,520,0,0,1106,0,525,109,-4,2106,0,0,109,5,1207,-3,1,10,1006,10,548,2207,-4,-2,10,1006,10,548,21201,-4,0,-4,1105,1,616,22101,0,-4,1,21201,-3,-1,2,21202,-2,2,3,21101,0,567,0,1106,0,525,22101,0,1,-4,21101,1,0,-1,2207,-4,-2,10,1006,10,586,21102,1,0,-1,22202,-2,-1,-2,2107,0,-3,10,1006,10,608,21202,-1,1,1,21102,608,1,0,106,0,483,21202,-2,-1,-2,22201,-4,-2,-4,109,-5,2105,1,0]
-brain = Program(drawing_program, pause_on_output=True)
-grid = {}
-robot_location = (0,0)
-robot_facing = 'u'
+drawing_program = [3,8,1005,8,328,1106,0,11,0,0,0,104,1,104,0,3,8,102,-1,8,10,101,1,10,10,4,10,108,1,8,10,4,10,101,0,8,28,1006,0,13,3,8,102,-1,8,10,101,1,10,10,4,10,1008,8,1,10,4,10,1002,8,1,54,1,1103,9,10,1006,0,97,2,1003,0,10,1,105,6,10,3,8,102,-1,8,10,1001,10,1,10,4,10,1008,8,1,10,4,10,1001,8,0,91,3,8,102,-1,8,10,101,1,10,10,4,10,1008,8,0,10,4,10,102,1,8,113,2,109,5,10,1006,0,96,1,2,5,10,3,8,1002,8,-1,10,101,1,10,10,4,10,1008,8,0,10,4,10,102,1,8,146,2,103,2,10,1006,0,69,2,9,8,10,1006,0,25,3,8,102,-1,8,10,1001,10,1,10,4,10,1008,8,0,10,4,10,101,0,8,182,3,8,1002,8,-1,10,101,1,10,10,4,10,108,1,8,10,4,10,1001,8,0,203,2,5,9,10,1006,0,0,2,6,2,10,3,8,102,-1,8,10,101,1,10,10,4,10,108,1,8,10,4,10,1002,8,1,236,2,4,0,10,3,8,1002,8,-1,10,1001,10,1,10,4,10,1008,8,0,10,4,10,1002,8,1,263,2,105,9,10,1,103,15,10,1,4,4,10,2,109,7,10,3,8,1002,8,-1,10,101,1,10,10,4,10,1008,8,0,10,4,10,1001,8,0,301,1006,0,63,2,105,6,10,101,1,9,9,1007,9,1018,10,1005,10,15,99,109,650,104,0,104,1,21102,387508441116,1,1,21102,1,345,0,1106,0,449,21102,1,387353256852,1,21102,1,356,0,1105,1,449,3,10,104,0,104,1,3,10,104,0,104,0,3,10,104,0,104,1,3,10,104,0,104,1,3,10,104,0,104,0,3,10,104,0,104,1,21101,179410308315,0,1,21102,1,403,0,1106,0,449,21101,206199495827,0,1,21102,414,1,0,1105,1,449,3,10,104,0,104,0,3,10,104,0,104,0,21102,718086758760,1,1,21102,1,437,0,1105,1,449,21101,838429573908,0,1,21102,448,1,0,1106,0,449,99,109,2,21202,-1,1,1,21102,1,40,2,21102,480,1,3,21101,470,0,0,1105,1,513,109,-2,2105,1,0,0,1,0,0,1,109,2,3,10,204,-1,1001,475,476,491,4,0,1001,475,1,475,108,4,475,10,1006,10,507,1102,0,1,475,109,-2,2106,0,0,0,109,4,2101,0,-1,512,1207,-3,0,10,1006,10,530,21101,0,0,-3,21202,-3,1,1,21201,-2,0,2,21102,1,1,3,21102,549,1,0,1105,1,554,109,-4,2106,0,0,109,5,1207,-3,1,10,1006,10,577,2207,-4,-2,10,1006,10,577,22102,1,-4,-4,1106,0,645,22102,1,-4,1,21201,-3,-1,2,21202,-2,2,3,21101,596,0,0,1106,0,554,22101,0,1,-4,21102,1,1,-1,2207,-4,-2,10,1006,10,615,21101,0,0,-1,22202,-2,-1,-2,2107,0,-3,10,1006,10,637,21201,-1,0,1,21101,637,0,0,106,0,512,21202,-2,-1,-2,22201,-4,-2,-4,109,-5,2106,0,0]
 
 TURN_LEFT={'u':'l','l':'d','d':'r','r':'u'}
 TURN_RIGHT={'u':'r','r':'d','d':'l','l':'u'}
@@ -578,7 +574,7 @@ def read_camera(location, grid, brain):
     brain.inputs.append(color)
 
 def advance(location, facing):
-    if DEBUG:print location, facing
+    if DEBUG:print(location, facing)
     if facing == 'u':
         location = (location[0], location[1]-1)
     elif facing == 'd':
@@ -588,32 +584,38 @@ def advance(location, facing):
     elif facing == 'r':
         location = (location[0]+1, location[1])
     else:
-        print "Bad direction:", facing
+        print("Bad direction:", facing)
         assert(False)
 
     return location
 
 # Start here
-grid[robot_location] = 1  # Start on white
-read_camera(robot_location, grid, brain)
-stop = False
-
-while not stop:
-    color, stop = brain.run()  # Stops on output
-    if stop:
-        assert (color is None)
-        break
-
-    grid[robot_location] = color
-
-    turn_direction, stop = brain.run()
-
-    robot_facing = TURN[turn_direction][robot_facing]
-    robot_location = advance(robot_location, robot_facing)
-
+def run_paint_robot(start_color):
+    brain = Program(drawing_program, pause_on_output=True)
+    grid = {}
+    robot_location = (0,0)
+    robot_facing = 'u'
+    grid[robot_location] = start_color #1  # Start on white
     read_camera(robot_location, grid, brain)
+    stop = False
 
-print len(grid)
+    while not stop:
+        color, stop = brain.run()  # Stops on output
+        if stop:
+            assert (color is None)
+            break
+
+        grid[robot_location] = color
+    
+        turn_direction, stop = brain.run()
+        robot_facing = TURN[turn_direction][robot_facing]
+        robot_location = advance(robot_location, robot_facing)
+
+        read_camera(robot_location, grid, brain)
+
+    return grid
+
+print(len(run_paint_robot(0)))
 
 def pretty_print_grid (grid):
     minx = min([a[0] for a in grid.keys()])
@@ -621,18 +623,6 @@ def pretty_print_grid (grid):
     miny = min([a[1] for a in grid.keys()])
     maxy = max([a[1] for a in grid.keys()])
 
-    width = maxx-minx +1  # Extra 1 for the origin
-    height = maxy-miny +1
+    print("\n".join(["".join(['#' if (col,row) in grid and grid[(col,row)] else ' ' for col in range(minx,maxx+1)]) for row in range(miny,maxy+1)]))
 
-    out=[]
-    for y in range(height):
-        out.append(['.']*width)
-
-    for location in grid.keys():
-        #print item
-        if grid[location]:  # 1=white
-            out[ location[1] -miny ][ location[0] -minx ] = '#'
-
-    print "\n".join(["".join([str(s) for s in row]) for row in out])
-
-pretty_print_grid(grid)
+pretty_print_grid(run_paint_robot(1))

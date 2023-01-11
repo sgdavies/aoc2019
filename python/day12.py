@@ -1,6 +1,7 @@
 import itertools
 import re
 import operator
+from functools import reduce
 
 DEBUG=0  # 0=none, 1=info, 2=debug
 
@@ -39,12 +40,12 @@ class World:
 
         key = self._prev_world_key()
         if DEBUG and self.step_number < 5:
-            print "\tKey:", self.step_number, key
-            print self.previous_worlds.keys()
+            print("\tKey:", self.step_number, key)
+            print(self.previous_worlds.keys())
             self.print_world()
 
         if key in self.previous_worlds:
-            if DEBUG: print "Last key:", self.step_number, key
+            if DEBUG: print("Last key:", self.step_number, key)
             return self.previous_worlds[key]
         else:
             return None
@@ -60,7 +61,7 @@ class World:
             out += "\n"
 
         out += "Total energy: {}".format(self.total_energy())
-        print out
+        print(out)
 
     def _prev_world_key(self):
         #return ", ".join([moon.short_str() for moon in self.moons])
@@ -73,7 +74,7 @@ class Moon:
         # Initial_positions is a string like <x=2, y=-10, z=-7>
         match = Moon.initial_re.match(initial_positions)
         if not match:
-            print "Didn't recognise input:", initial_positions
+            print("Didn't recognise input:", initial_positions)
 
         self.pos = [int(match.group('x')), int(match.group('y')), int(match.group('z'))]
         self.vel = [0,0,0]
@@ -119,16 +120,16 @@ def tests():
     for ix in range(100): world.step()
     assert(world.total_energy() == 1940)
 
-    real_input = """<x=1, y=2, z=-9>
+    old_real_input = """<x=1, y=2, z=-9>
 <x=-1, y=-9, z=-4>
 <x=17, y=6, z=8>
 <x=12, y=4, z=2>"""
 
-    world = World(real_input)
+    world = World(old_real_input)
     for ix in range(1000): world.step()
     assert(world.total_energy() == 7471)
 
-    print "All tests passed"
+    print("All tests passed")
 
 tests()
 
@@ -144,7 +145,7 @@ world = World(example_one_input)
 while world.step() is None:
     pass
 
-if DEBUG: print "Done after {} iterations".format(world.step_number)
+if DEBUG: print("Done after {} iterations".format(world.step_number))
 assert(world.step_number == 2772)
 
 # Conclusion: each axis-position loops after a small number of steps (<100)
@@ -162,7 +163,7 @@ def find_loop_length (initial_state):
     start = time.time()
     world = World(initial_state)
 
-    for ix in xrange(2*MAX_LOOP_LENGTH):
+    for ix in range(2*MAX_LOOP_LENGTH):
         world.step()
 
     # One tuple per moon.
@@ -179,9 +180,9 @@ def find_loop_length (initial_state):
               try:
                 moon[axis].append(k[moonx][0][axis])
               except:
-                print k
-                print moonx
-                print axis
+                print(k)
+                print(moonx)
+                print(axis)
                 raise
 
     axis_loops=[0,0,0]
@@ -190,9 +191,9 @@ def find_loop_length (initial_state):
         for moonx, moon in enumerate(moons):
             #print "Moon {}: x {}={}, y {}={}, z {}={}".format(moonx+1, min(moon[0]), max(moon[0]), min(moon[1]), max(moon[1]), min(moon[2]), max(moon[2]))
             #print "x:", moon[0]
-            for ix in xrange(1, MAX_LOOP_LENGTH+1):
+            for ix in range(1, MAX_LOOP_LENGTH+1):
                 success = True
-                for jx in xrange(ix):
+                for jx in range(ix):
                     if moon[axis][jx] != moon[axis][jx + ix]:
                         success = False
                         break
@@ -205,19 +206,19 @@ def find_loop_length (initial_state):
         axis_loops[axis] = longest
 
     if any([x==0 for x in axis_loops]):
-        print "Failed to find a loop (searched up to {})!".format(MAX_LOOP_LENGTH)
-        print axis_loops
+        print("Failed to find a loop (searched up to {})!".format(MAX_LOOP_LENGTH))
+        print(axis_loops)
 
     if DEBUG or True:
-        print axis_loops
-        print axis_loops[0]*axis_loops[1]*axis_loops[2]
+        print(axis_loops)
+        print(axis_loops[0]*axis_loops[1]*axis_loops[2])
         import sys;sys.stdout.flush()
 
     # lowest common multiple
     def lcm (numbers):
         #return reduce(lambda x,y: (lambda a,b: next(i for i in xrange(max(a,b),a*b+1) if i%a==0 and i%b==0))(x,y), numbers)
         def gcd (numbers):
-            from fractions import gcd
+            from math import gcd
             return reduce(gcd, numbers)
 
         def llcm (a,b):
@@ -226,11 +227,11 @@ def find_loop_length (initial_state):
         return reduce(llcm, numbers, 1)
 
     answer = lcm(axis_loops)
-    print "Found answer {} in {:.1f} seconds".format(answer, time.time()-start)
+    print("Found answer {} in {:.1f} seconds".format(answer, time.time()-start))
     return answer
 
 example_one_loop = find_loop_length(example_one_input)
-print example_one_loop
+print(example_one_loop)
 assert(example_one_loop == 2772)
 
 MAX_LOOP_LENGTH = 7000
@@ -239,14 +240,22 @@ example_two_input="""<x=-8, y=-10, z=0>
 <x=2, y=-7, z=3>
 <x=9, y=-8, z=-3>"""
 example_two_loop = find_loop_length(example_two_input)
-print "Answer:", example_two_loop
+print("Answer:", example_two_loop)
 assert(example_two_loop == 4686774924)
 
 puzzle_part_two_input="""<x=1, y=2, z=-9>
 <x=-1, y=-9, z=-4>
 <x=17, y=6, z=8>
 <x=12, y=4, z=2>"""
+real_input ="""<x=-7, y=-1, z=6>
+<x=6, y=-9, z=-9>
+<x=-12, y=2, z=-7>
+<x=4, y=-17, z=-12>"""
+world = World(real_input)
+for ix in range(1000): world.step()
+print("Part one answer: ", world.total_energy()) # == 7471)
 
-MAX_LOOP_LENGTH = 200000
-length = find_loop_length(puzzle_part_two_input)
-print "Answer:", length
+MAX_LOOP_LENGTH = 500000
+length = find_loop_length(real_input)
+print("Part two answer:", length)
+
