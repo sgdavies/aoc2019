@@ -329,8 +329,9 @@ if __name__ == "__main__":
 
         assert(test_map(EXAMPLE_TWO) == 58)
 
-        assert(test_map(PUZZLE_INPUT) == 616)
+        #assert(test_map(PUZZLE_INPUT) == 616)
 
         log.critical("All tests passed")
 
     tests()
+    print(test_map(PUZZLE_INPUT))

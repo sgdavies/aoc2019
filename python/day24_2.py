@@ -185,11 +185,11 @@ test_input="""....#
 ..#..
 #...."""
 
-puzzle_input="""#.#..
-.#.#.
+puzzle_input=""".##.#
+###..
 #...#
-.#..#
-##.#."""
+##.#.
+.###."""
 
 def tests():
     #log.setLevel(logging.DEBUG)

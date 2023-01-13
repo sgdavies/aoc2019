@@ -86,11 +86,11 @@ test_input="""....#
 ..#..
 #...."""
 
-puzzle_input="""#.#..
-.#.#.
+puzzle_input=""".##.#
+###..
 #...#
-.#..#
-##.#."""
+##.#.
+.###."""
 
 def tests():
     #log.setLevel(logging.DEBUG)
@@ -141,7 +141,8 @@ def tests():
     eris.run_until_dupe()
     log.debug(eris.step_count)
     log.debug(eris.biodiversity_value())
-    assert(eris.biodiversity_value() == 25719471)
+    #assert(eris.biodiversity_value() == 25719471)
+    print(eris.biodiversity_value())
 
     log.critical("All tests passed")
 
