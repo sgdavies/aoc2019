@@ -42,8 +42,10 @@ class Node():
 class Maze():
     def __init__(self, s: str):
         self.nodes = self.parse_input(s)
-        self.nodes['@'].find_hidden(self.nodes)  # Find out which keys are hidden behind each node
+        self.nodes['@'].find_hidden(self.nodes)  # Find which keys are hidden behind each node
+        self.all_keys = [name for name in self.nodes.keys() if is_key(name)]
         self.precalc_distances()
+        self.tsp_lower_cache = {}
 
     def parse_input(self, s: str):
         world = {}
@@ -81,7 +83,6 @@ class Maze():
 
     def precalc_distances(self):
         # Return double-dict of all keys to all other keys : d[start][send] = distance
-        ## TODO enhance: each x-y, also return list of keys picked up enroute, and list of doors(?)
         ## With keys: then when chosing to go to a key, automatically collect the enroute ones.
         ## This should reduce (a lot?) the number of subsequent choices.
         keys = [node.name for node in self.nodes.values() if is_key(node.name)]
@@ -121,23 +122,24 @@ class Maze():
         return dist, xprev
 
     def solve(self, order=None):
-        all_keys = [name for name in self.nodes.keys() if is_key(name)]
         vis_keys, vis_doors = self.nodes['@'].find_hidden(self.nodes)
 
-        best,best_order = self.solve_from(len(all_keys), vis_keys, vis_doors, '@', 0, '', order)
-        #print(best_order)
+        best,bo = self.solve_from(set(self.all_keys), vis_keys, vis_doors, '@', 0, '', order=order)
+        print(best,bo)
+        #print(", ".join(["{}: {}".format(k,self.tsp_lower_cache[k]) for k in sorted(self.tsp_lower_cache.keys())]))
         return best
 
-    def solve_from(self, n_keys, vis_keys, vis_doors, loc, dist, collected_keys, order=None):
-        if len(collected_keys) == n_keys: return dist, collected_keys
-        #if len(collected_keys) < 3 or order is not None: print(loc,dist,collected_keys,vis_keys,vis_doors)
+    def solve_from(self, remaining_keys, vis_keys, vis_doors, loc, dist, collected_keys, best=INF, order=None):
+        #if len(collected_keys) < 3 or order is not None: print(loc,dist,collected_keys,vis_keys,vis_doors, "best:",best)
+        if not remaining_keys:
+            return min(dist,best), collected_keys
+        if not self.can_beat(best, dist, loc, remaining_keys):
+            return best, collected_keys
 
-        best = None
         best_order = "FAILED"
         if order:
             choices = [order[0]]
             order = order[1:]
-            #print("oc",choices, order)
         else:
             choices = vis_keys
         for next_key in choices:
@@ -145,6 +147,8 @@ class Maze():
             new_keys = self.keys_on_route[loc][next_key]
             new_vk = set(vis_keys)
             new_vk -= set(new_keys)
+            new_rk = set(remaining_keys)
+            new_rk -= set(new_keys)
             new_coll = collected_keys + "".join([k for k in new_keys if k not in collected_keys])
             new_vd = set(vis_doors)
 
@@ -165,11 +169,11 @@ class Maze():
                         doors_to_check.update(newdoors)
                         doors_to_check.discard(door_to_check)
 
-            this_dist,this_order = self.solve_from(n_keys, new_vk, new_vd, next_key, dist+self.dists[loc][next_key], new_coll, order)
+            d,o = self.solve_from(new_rk, new_vk, new_vd, next_key, dist+self.dists[loc][next_key], new_coll, best, order)
 
-            if this_dist is not None and (best is None or this_dist < best):
-                best = this_dist
-                best_order = this_order
+            if d < best:
+                best = d
+                best_order = o
 
         return best, best_order
 
@@ -194,6 +198,41 @@ class Maze():
                         ds.update(dis)
                         ds.discard(dd)  # unnecessary? but safe (dd=ds.pop())
         return vis_keys, vis_doors
+
+    def xcan_beat(self, best, dist, loc, remaining_keys):
+        # Return True if a lower bound on remaining work would let you beat 'best'
+        if len(remaining_keys) == 1:
+            return dist + self.dists[loc][remaining_keys.copy().pop()] < best
+        elif len(remaining_keys) < 8: # TODO tune
+            for tkey in remaining_keys:
+                beat = self.can_beat(best, dist+self.dists[loc][tkey], tkey, [k for k in remaining_keys if k != tkey])
+                if beat: return True  # Else try next tkey
+            return False
+        else:
+            return True  # Don't bother for larger sets
+
+    def can_beat(self, best, dist, loc, remaining_keys):
+        if len(remaining_keys) < 6:
+            lower_bound = dist + self.tsp_lower(loc, remaining_keys, 0)
+            return lower_bound < best
+        else:
+            return True
+
+    def tsp_lower(self, key, rem, dist):  # Lower bound on TSP from here to all remaining keys
+        if not rem: return dist
+        cache_key = key + "".join(sorted(rem))
+        if True or cache_key not in self.tsp_lower_cache:
+            best = INF
+            for tk in rem:
+                attempt = self.tsp_lower(tk, [k for k in rem if k != tk], dist+self.dists[key][tk])
+                if attempt < best: best = attempt
+            ret = best
+            #self.tsp_lower_cache[cache_key] = (ret-dist,0)  # Cache ignoring starting offest
+        else:
+            ret,count = self.tsp_lower_cache[cache_key]
+            self.tsp_lower_cache[cache_key] = (ret,count+1)
+            ret -= dist
+        return ret ##self.tsp_lower_cache[cache_key]
 
 maze1 = """#########
 #b.A.@.a#
@@ -225,20 +264,21 @@ maze5 = """########################
 ########################"""
 
 if __name__ == "__main__":
-    assert(Maze(maze1).solve() == 8)
-    assert(Maze(maze2).solve() == 86)
-    assert(Maze(maze3).solve() == 132)
-    assert(Maze(maze5).solve() == 81)
-    exit()
+    if True:  # Tests
+        assert(Maze(maze1).solve() == 8)
+        assert(Maze(maze2).solve() == 86)
+        assert(Maze(maze3).solve() == 132)
+        assert(Maze(maze5).solve() == 81)
+        print("Tests passed")
     import time
     o="afbjgnhdloepcikm"
     maze=Maze(maze4)
-    for i in range(9,12):
+    for i in range(8,13): #(9,12):
         to=o[:-i]
-        print("#{}#".format(to))
         start=time.time()
         ans = maze.solve(order=to)
         t = time.time()-start
         print(ans,'\t',len(to),'\t',"%.2f"%t)
+        assert(ans==136)
     #print(Maze(maze4).solve(order="")) # takes too long # ==136
     #print(Maze(maze4).solve()) # takes too long # ==136
