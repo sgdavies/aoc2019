@@ -28,9 +28,8 @@ class Node():
             self._doors = doors
         return self._keys, self._doors
 
-    def get_keys(self, nodes):
-        if self._keys is None:
-            self.find_hidden(nodes)
+    def get_keys(self):
+        assert(self._keys is not None), "Call find_hidden() first"
         return self._keys
 
     def __repr__(self):
@@ -45,7 +44,6 @@ class Maze():
         self.nodes['@'].find_hidden(self.nodes)  # Find which keys are hidden behind each node
         self.all_keys = [name for name in self.nodes.keys() if is_key(name)]
         self.precalc_distances()
-        self.tsp_lower_cache = {}
 
     def parse_input(self, s: str):
         world = {}
@@ -82,9 +80,8 @@ class Maze():
         return nodes
 
     def precalc_distances(self):
-        # Return double-dict of all keys to all other keys : d[start][send] = distance
+        # Return double-dict of all keys to all other keys : d[start][end] = distance
         ## With keys: then when chosing to go to a key, automatically collect the enroute ones.
-        ## This should reduce (a lot?) the number of subsequent choices.
         keys = [node.name for node in self.nodes.values() if is_key(node.name)]
         dists = {}
         prevs = {}
@@ -95,8 +92,9 @@ class Maze():
             prevs[s] = p
         self.dists = dists
         self.keys_on_route = prevs
-        #print(self.dists)
-        #print(self.keys_on_route)
+        # ordered dists - keyed by node, list of (node,dist) from this node. Keys only.
+        # Used for MST and other functions.
+        self.odists = {k : sorted([(k1,v1) for k1,v1 in v.items() if is_key(k1) and k1!=k], key=lambda x: x[1]) for k,v in self.dists.items()}
 
     def dijk(self, source):
         Q = []
@@ -126,7 +124,6 @@ class Maze():
 
         best,bo = self.solve_from(set(self.all_keys), vis_keys, vis_doors, '@', 0, '', order=order)
         print(best,bo)
-        #print(", ".join(["{}: {}".format(k,self.tsp_lower_cache[k]) for k in sorted(self.tsp_lower_cache.keys())]))
         return best
 
     def solve_from(self, remaining_keys, vis_keys, vis_doors, loc, dist, collected_keys, best=INF, order=None):
@@ -141,7 +138,11 @@ class Maze():
             choices = [order[0]]
             order = order[1:]
         else:
-            choices = vis_keys
+            #choices = vis_keys
+            # TODO - measure & decide. Idea is to find good routes early to help pruning.
+            # Order by closest first - faster(?)
+            # But maybe not if that means not grabbing multiple keys
+            choices = [n for n,_ in self.odists[loc] if n in vis_keys]
         for next_key in choices:
             #if order is not None: print("->", next_key)
             new_keys = self.keys_on_route[loc][next_key]
@@ -199,40 +200,58 @@ class Maze():
                         ds.discard(dd)  # unnecessary? but safe (dd=ds.pop())
         return vis_keys, vis_doors
 
-    def xcan_beat(self, best, dist, loc, remaining_keys):
-        # Return True if a lower bound on remaining work would let you beat 'best'
-        if len(remaining_keys) == 1:
-            return dist + self.dists[loc][remaining_keys.copy().pop()] < best
-        elif len(remaining_keys) < 8: # TODO tune
-            for tkey in remaining_keys:
-                beat = self.can_beat(best, dist+self.dists[loc][tkey], tkey, [k for k in remaining_keys if k != tkey])
-                if beat: return True  # Else try next tkey
-            return False
-        else:
-            return True  # Don't bother for larger sets
-
     def can_beat(self, best, dist, loc, remaining_keys):
-        if len(remaining_keys) < 6:
-            lower_bound = dist + self.tsp_lower(loc, remaining_keys, 0)
-            return lower_bound < best
+        # Find a lower bound for collecting remaining keys. Lower bound assumes keys can
+        # be collected in any order (ignoring doors).
+        if len(remaining_keys) < 5:
+            lower_bound = self.tsp_lower(loc, remaining_keys, dist)
         else:
-            return True
+            #lower_bound = 0 # Don't check
+            if type(remaining_keys) is not str:
+                remaining_keys = "".join(remaining_keys)
+            lower_bound = self.mst_lower(loc, remaining_keys, dist)
+        return lower_bound < best
+            
 
     def tsp_lower(self, key, rem, dist):  # Lower bound on TSP from here to all remaining keys
         if not rem: return dist
-        cache_key = key + "".join(sorted(rem))
-        if True or cache_key not in self.tsp_lower_cache:
-            best = INF
-            for tk in rem:
-                attempt = self.tsp_lower(tk, [k for k in rem if k != tk], dist+self.dists[key][tk])
-                if attempt < best: best = attempt
-            ret = best
-            #self.tsp_lower_cache[cache_key] = (ret-dist,0)  # Cache ignoring starting offest
-        else:
-            ret,count = self.tsp_lower_cache[cache_key]
-            self.tsp_lower_cache[cache_key] = (ret,count+1)
-            ret -= dist
-        return ret ##self.tsp_lower_cache[cache_key]
+        best = INF
+        for tk in rem:
+            attempt = self.tsp_lower(tk, [k for k in rem if k != tk], dist+self.dists[key][tk])
+            if attempt < best: best = attempt
+        ret = best
+        return ret
+
+    def mst_lower(self, key, rem, dist):
+        # Lower bound using minimum spanning tree.  MST is a lower bound: if it branches,
+        # it doesn't count the need to backtrack along the branches.
+        # Add current node last - this is a slight improvement as it prevents going in
+        # both directions from current node (which could be shorter but is impossible
+        # without backtracking).
+        state = {}  # Dict of name: [index, value] arrays that we'll udpate as we go along
+        remain = rem
+        name = remain[0]
+        remain = remain[1:]
+        mst_nodes = name
+        mst_value = 0
+        while remain:
+            state[name] = [0, INF]
+            # Find the remaining node that's closet to any node already in the tree
+            for n in state:
+                ix, value = state[n]
+                while self.odists[n][ix][0] not in remain or self.odists[n][ix][0] in mst_nodes:
+                    ix += 1 # Must always terminate as every node is connected to every other
+                state[n] = [ix, self.odists[n][ix][1] ]
+            n,best = min(state.items(), key=lambda x: x[1][1]) #[1][1] = item[1] = value
+            name = self.odists[n][best[0]][0]
+            mst_nodes += name
+            mst_value += best[1]
+            state[name] = [best[0]+1, INF]
+            remain = remain.replace(name, '')
+        # Have an MST for all remaining nodes - now add the starting node
+        ix = 0
+        while self.odists[key][ix][0] not in mst_nodes: ix += 1
+        return mst_value + self.odists[key][ix][1] + dist
 
 maze1 = """#########
 #b.A.@.a#
@@ -264,21 +283,36 @@ maze5 = """########################
 ########################"""
 
 if __name__ == "__main__":
-    if True:  # Tests
+    if False:  # Tests
+        assert(Maze(maze2).mst_lower('c','abdef',0) == 48)
         assert(Maze(maze1).solve() == 8)
         assert(Maze(maze2).solve() == 86)
         assert(Maze(maze3).solve() == 132)
         assert(Maze(maze5).solve() == 81)
+        assert(Maze(maze4).solve(order="afbjgnhd") == 136) # full soln takes 10 min
         print("Tests passed")
-    import time
-    o="afbjgnhdloepcikm"
-    maze=Maze(maze4)
-    for i in range(8,13): #(9,12):
-        to=o[:-i]
-        start=time.time()
-        ans = maze.solve(order=to)
-        t = time.time()-start
-        print(ans,'\t',len(to),'\t',"%.2f"%t)
-        assert(ans==136)
-    #print(Maze(maze4).solve(order="")) # takes too long # ==136
-    #print(Maze(maze4).solve()) # takes too long # ==136
+    if False:
+        import time
+        o="afbjgnhdloepcikm"
+        maze=Maze(maze4)
+        for i in range(12,15): #(9,12):
+            to=o[:-i]
+            start=time.time()
+            ans = maze.solve(order=to)
+            t = time.time()-start
+            print(ans,'\t',len(to),'\t',"%.2f"%t)
+            assert(ans==136)
+    
+    with open('18.txt') as f: data = f.read()
+    maze=Maze(data)
+    if True:
+        print(maze.nodes['@'].get_keys())
+        import time
+        o="umejqzwnxtapiokylrvscfhdgb"
+        for i in range(18, 27): #(9,12):
+            to=o[:-i]
+            start=time.time()
+            ans = maze.solve(order=to)
+            t = time.time()-start
+            print(ans,'\t',len(to),'\t',"%.2f"%t)
+    #print(maze.solve())
